@@ -1,0 +1,74 @@
+// ── Enumerations ──────────────────────────────────────────────────────────────
+
+export type LoanType = 'Direct' | 'Through Mediator';
+export type LoanStatus = 'Active' | 'Closed' | 'Defaulted' | 'Restructured';
+export type PaymentStatus = 'Received' | 'Pending' | 'Waived' | 'Partial';
+
+// ── Loan Master ───────────────────────────────────────────────────────────────
+
+export interface Loan {
+  loanId: string;                   // "L001", auto-generated
+  lenderName?: string;              // who gave the money (blank = admin/self)
+  lenderPhone?: string;             // lender's phone
+  borrowerName: string;
+  borrowerPhone: string;
+  borrowerAddress: string;
+  loanType: LoanType;
+  mediatorName: string;
+  mediatorPhone: string;
+  mediatorCommissionPct: number;    // % of interest going to mediator
+  principalAmount: number;          // ₹
+  annualInterestRate: number;       // %
+  // Derived (always recalculated via deriveLoanFields, not directly edited)
+  monthlyInterestRate: number;      // annualInterestRate / 12
+  dateGiven: string;                // ISO date string
+  monthlyDueDay: number;            // day-of-month from dateGiven
+  expectedTenureMonths: number;
+  monthlyInterestAmount: number;    // principal × monthlyInterestRate / 100
+  mediatorMonthlyShare: number;     // monthlyInterestAmount × commissionPct / 100
+  netMonthlyReceipt: number;        // monthlyInterestAmount − mediatorMonthlyShare
+  loanStatus: LoanStatus;
+  remarks: string;
+  createdAt: string;                // ISO timestamp
+  updatedAt: string;
+}
+
+// ── Monthly Payment ───────────────────────────────────────────────────────────
+
+export interface Payment {
+  id: string;                       // uuid
+  loanId: string;
+  borrowerName: string;             // denormalized for display
+  monthYear: string;                // "Apr-2025"
+  dueDate: string;                  // ISO date
+  interestAmount: number;           // from Loan.monthlyInterestAmount
+  mediatorShare: number;            // from Loan.mediatorMonthlyShare
+  netAmountExpected: number;        // from Loan.netMonthlyReceipt
+  amountReceived: number;
+  dateReceived: string;             // ISO date or ""
+  paymentStatus: PaymentStatus;
+  daysOverdue: number;              // calculated: today - dueDate (if overdue)
+  pendingAmount: number;            // netAmountExpected − amountReceived
+  remarks: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── App Meta ──────────────────────────────────────────────────────────────────
+
+export interface AppMeta {
+  isDataLoaded: boolean;
+  lastImportedAt: string;
+  lastExportedAt: string;
+}
+
+// ── Dashboard KPIs ────────────────────────────────────────────────────────────
+
+export interface DashboardKPIs {
+  totalActiveLoans: number;
+  totalPrincipalOutstanding: number;
+  monthlyInterestExpected: number;
+  netMonthlyIncome: number;
+  totalOverduePayments: number;
+  totalPendingAmount: number;
+}
