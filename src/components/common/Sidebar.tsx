@@ -2,16 +2,19 @@ import { NavLink, Link } from 'react-router-dom';
 import { LayoutDashboard, CreditCard, BarChart3, Upload, HandCoins, User } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
-const adminNav = [
+const commonNav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/loans',     icon: CreditCard,      label: 'Loans' },
   { to: '/payments',  icon: BarChart3,        label: 'Payments' },
-  { to: '/import',    icon: Upload,           label: 'Import / Export' },
+];
+
+const adminOnlyNav = [
+  { to: '/import', icon: Upload, label: 'Import / Export' },
 ];
 
 export function Sidebar() {
   const { isAdmin, displayName } = useAuth();
-  const navItems = isAdmin ? adminNav : [{ to: '/dashboard', icon: LayoutDashboard, label: 'My Dashboard' }];
+  const navItems = isAdmin ? [...commonNav, ...adminOnlyNav] : commonNav;
   const roleLabel = isAdmin ? 'Admin' : 'User';
   const initials = displayName.split(' ').map((w) => w[0]?.toUpperCase() ?? '').slice(0, 2).join('');
 

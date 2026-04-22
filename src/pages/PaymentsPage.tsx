@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import type { Payment } from '@/types';
 import { usePayments } from '@/context/PaymentContext';
+import { useLoans } from '@/context/LoanContext';
 import { useToast } from '@/components/common/Toast';
 import { Modal } from '@/components/common/Modal';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -10,9 +11,23 @@ import { PaymentForm } from '@/components/payments/PaymentForm';
 import { PaymentTable } from '@/components/payments/PaymentTable';
 import { formatCurrency } from '@/utils/formatUtils';
 import { derivePaymentFields } from '@/services/calculationService';
+import { useAuth } from '@/context/AuthContext';
 
 export function PaymentsPage() {
   const { payments, addPayment, updatePayment, deletePayment } = usePayments();
+  const { loans } = useLoans();
+  const { hasFullAccess, isAdmin, userPhone } = useAuth();
+
+  // For phone users: only allow actions on payments for loans they own as lender
+  const ownedLoanIds = useMemo<Set<string> | undefined>(() => {
+    if (isAdmin) return undefined; // admin owns all
+    if (!userPhone) return new Set();
+    const norm = (p: string) => p.replace(/\D/g, '').slice(-10);
+    const myPhone = norm(userPhone);
+    return new Set(
+      loans.filter((l) => l.lenderPhone && norm(l.lenderPhone) === myPhone).map((l) => l.loanId)
+    );
+  }, [isAdmin, userPhone, loans]);
   const { showSuccess, showError } = useToast();
   const location = useLocation();
 
@@ -110,16 +125,20 @@ export function PaymentsPage() {
         onDelete={(id) => setDeletingId(id)}
         onAdd={() => { setDefaultLoanId(undefined); setShowForm(true); }}
         onMarkPaid={handleMarkPaid}
+        readOnly={!hasFullAccess}
+        ownedLoanIds={ownedLoanIds}
       />
 
       {/* Floating action button — mobile only */}
-      <button
-        onClick={() => { setDefaultLoanId(undefined); setShowForm(true); }}
-        className="fixed bottom-20 right-4 z-30 md:hidden w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-transform"
-        aria-label="Record Payment"
-      >
-        <Plus size={24} />
-      </button>
+      {hasFullAccess && (
+        <button
+          onClick={() => { setDefaultLoanId(undefined); setShowForm(true); }}
+          className="fixed bottom-20 right-4 z-30 md:hidden w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-transform"
+          aria-label="Record Payment"
+        >
+          <Plus size={24} />
+        </button>
+      )}
 
       {showForm && (
         <Modal title="Record Payment" onClose={() => { setShowForm(false); setDefaultLoanId(undefined); }} size="lg">

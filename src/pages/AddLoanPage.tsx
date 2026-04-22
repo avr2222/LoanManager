@@ -17,8 +17,8 @@ export function AddLoanPage() {
 
   async function handleSubmit(loan: Loan) {
     try {
-      await addLoan(loan);
-      showSuccess(`Loan ${loan.loanId} added`);
+      const added = await addLoan(loan);
+      showSuccess(`Loan ${added.loanId} added`);
       navigate('/dashboard', { replace: true });
     } catch {
       showError('Failed to add loan');

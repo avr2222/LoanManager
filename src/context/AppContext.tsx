@@ -169,12 +169,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [loans, payments]);
 
   const clearAllData = useCallback(async () => {
-    for (const loan of loans) {
-      await loansService.delete(loan.loanId);
-    }
+    // Delete payments first (FK dependency), then loans — both in one query each
+    await paymentsService.deleteAll();
+    await loansService.deleteAll();
     bulkLoadLoans([]);
     bulkLoadPayments([]);
-  }, [loans, bulkLoadLoans, bulkLoadPayments]);
+  }, [bulkLoadLoans, bulkLoadPayments]);
 
   return (
     <AppContext.Provider value={{ loading, autoImporting, importFile, exportData, clearAllData }}>

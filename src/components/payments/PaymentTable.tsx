@@ -11,11 +11,16 @@ interface PaymentTableProps {
   onDelete: (id: string) => void;
   onAdd: () => void;
   onMarkPaid: (id: string) => void;
+  readOnly?: boolean;
+  /** When provided, action buttons are only shown for payments whose loanId is in this set */
+  ownedLoanIds?: Set<string>;
 }
 
 type SortKey = 'monthYear' | 'loanId' | 'borrowerName' | 'netAmountExpected' | 'amountReceived' | 'daysOverdue' | 'paymentStatus';
 
-export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid }: PaymentTableProps) {
+export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, readOnly, ownedLoanIds }: PaymentTableProps) {
+  // A row is editable if readOnly is false AND (no ownedLoanIds filter, or the payment's loan is owned by the current user)
+  const canAct = (p: Payment) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(p.loanId));
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'All'>('All');
   const [sortKey, setSortKey] = useState<SortKey>('daysOverdue');
@@ -99,14 +104,16 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid }: 
           <option value="Partial">Partial</option>
           <option value="Waived">Waived</option>
         </select>
-        <button
-          onClick={onAdd}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 shrink-0"
-        >
-          <Plus size={15} />
-          <span className="hidden sm:inline">Record Payment</span>
-          <span className="sm:hidden">Add</span>
-        </button>
+        {!readOnly && (
+          <button
+            onClick={onAdd}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 shrink-0"
+          >
+            <Plus size={15} />
+            <span className="hidden sm:inline">Record Payment</span>
+            <span className="sm:hidden">Add</span>
+          </button>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -131,14 +138,16 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid }: 
                     <p className="text-sm font-semibold text-slate-800">{p.borrowerName}</p>
                     <p className="text-xs text-slate-400">{p.monthYear} · Due {formatDate(p.dueDate)}</p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => onEdit(p)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg">
-                      <Edit2 size={15} />
-                    </button>
-                    <button onClick={() => onDelete(p.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+                  {canAct(p) && (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => onEdit(p)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg">
+                        <Edit2 size={15} />
+                      </button>
+                      <button onClick={() => onDelete(p.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs mt-3 pt-3 border-t border-slate-50">
                   <div>
@@ -160,7 +169,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid }: 
                     {p.daysOverdue > 0 && (
                       <span className="text-xs font-medium text-red-500 bg-red-50 px-2 py-0.5 rounded-full">{p.daysOverdue}d overdue</span>
                     )}
-                    {p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && (
+                    {canAct(p) && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && (
                       <button
                         onClick={() => onMarkPaid(p.id)}
                         className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
@@ -209,19 +218,21 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid }: 
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={p.paymentStatus} /></td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          {p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && (
-                            <button
-                              onClick={() => onMarkPaid(p.id)}
-                              title="Mark as Paid"
-                              className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg transition-colors"
-                            >
-                              <CheckCircle2 size={13} /> Paid
-                            </button>
-                          )}
-                          <button onClick={() => onEdit(p)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg" title="Edit"><Edit2 size={14} /></button>
-                          <button onClick={() => onDelete(p.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 size={14} /></button>
-                        </div>
+                        {canAct(p) && (
+                          <div className="flex items-center justify-end gap-1">
+                            {p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && (
+                              <button
+                                onClick={() => onMarkPaid(p.id)}
+                                title="Mark as Paid"
+                                className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg transition-colors"
+                              >
+                                <CheckCircle2 size={13} /> Paid
+                              </button>
+                            )}
+                            <button onClick={() => onEdit(p)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg" title="Edit"><Edit2 size={14} /></button>
+                            <button onClick={() => onDelete(p.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 size={14} /></button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}

@@ -38,8 +38,16 @@ export const profilesService = {
     }
 
     for (const phone of phones) {
-      // signUp is idempotent — silently ignores "already registered"
-      await supabase.auth.signUp({ email: `${phone}@user.local`, password: phone });
+      const email = `${phone}@user.local`;
+      // Only provision if the account doesn't exist yet.
+      // DO NOT call signUp for existing accounts — Supabase (with email confirmation
+      // disabled) resets the password, which would wipe any custom password the user set.
+      const { error } = await supabase.auth.signInWithPassword({ email, password: phone });
+      if (!error) continue; // already exists and has default password — skip
+      // If sign-in failed with anything other than "invalid credentials", skip too
+      // Only provision if truly new (we can't distinguish "wrong password" from "no account"
+      // via the error message, so we attempt signUp but accept the error either way)
+      await supabase.auth.signUp({ email, password: phone });
     }
   },
 

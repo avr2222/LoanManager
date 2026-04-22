@@ -38,7 +38,7 @@ function loanReducer(state: Loan[], action: LoanAction): Loan[] {
 
 interface LoanContextValue {
   loans: Loan[];
-  addLoan: (loan: Loan) => Promise<void>;
+  addLoan: (loan: Loan) => Promise<Loan>;
   updateLoan: (loan: Loan) => Promise<void>;
   deleteLoan: (loanId: string) => Promise<void>;
   setLoanStatus: (loanId: string, status: Loan['loanStatus']) => Promise<void>;
@@ -50,10 +50,15 @@ const LoanContext = createContext<LoanContextValue | null>(null);
 export function LoanProvider({ children }: { children: ReactNode }) {
   const [loans, dispatch] = useReducer(loanReducer, []);
 
-  const addLoan = useCallback(async (loan: Loan) => {
-    await loansService.upsert(loan);
-    profilesService.provisionFromLoans([loan]).catch(console.warn);
-    dispatch({ type: 'ADD', payload: loan });
+  const addLoan = useCallback(async (loan: Loan): Promise<Loan> => {
+    // Always get the next ID from the server — phone users can't see all loans
+    // via RLS so client-side generateLoanId() can produce a colliding ID.
+    const loanId = await loansService.getNextLoanId();
+    const finalLoan = { ...loan, loanId };
+    await loansService.upsert(finalLoan);
+    profilesService.provisionFromLoans([finalLoan]).catch(console.warn);
+    dispatch({ type: 'ADD', payload: finalLoan });
+    return finalLoan;
   }, []);
 
   const updateLoan = useCallback(async (loan: Loan) => {

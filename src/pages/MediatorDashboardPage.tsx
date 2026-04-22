@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FileText, ArrowRight, ChevronDown, ChevronUp, CheckCircle2, Users, X } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useLoans } from '@/context/LoanContext';
 import type { Loan } from '@/types';
 import { usePayments } from '@/context/PaymentContext';
@@ -161,6 +162,47 @@ export function MediatorDashboardPage() {
   // Loans where I am the borrower — show full interest amount and "Paid" label
   const borrowerLoanIds = useMemo(() => new Set(borrowerLoans.map((l) => l.loanId)), [borrowerLoans]);
 
+  // ── Monthly Expected vs Received chart (last 6 months) ──────
+  const monthlyChartData = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const yr = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      const key = `${yr}-${mo}`;
+
+      let expected = 0;
+      let received = 0;
+      let commission = 0;
+
+      for (const p of myPayments) {
+        // Normalise monthYear to "YYYY-MM" regardless of stored format
+        const pKey = p.monthYear.includes('-')
+          ? p.monthYear.slice(0, 7)
+          : (() => {
+              const dt = new Date(p.dueDate);
+              return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+            })();
+
+        if (pKey !== key) continue;
+
+        if (lenderLoanIds.has(p.loanId)) {
+          expected += p.netAmountExpected;
+          received += p.amountReceived;
+        }
+        if (mediatorLoans.some((l) => l.loanId === p.loanId)) {
+          commission += p.mediatorShare;
+        }
+      }
+
+      return { month: label, Expected: expected, Received: received, Commission: commission };
+    });
+  }, [myPayments, lenderLoanIds, mediatorLoans]);
+
+  const showChart = (hasLender || hasMediator) &&
+    monthlyChartData.some((d) => d.Expected > 0 || d.Commission > 0);
+
   async function handleMarkReceived(paymentId: string) {
     const payment = myPayments.find((p) => p.id === paymentId);
     if (!payment) return;
@@ -292,6 +334,42 @@ export function MediatorDashboardPage() {
             color={hasBorrower && hasLender ? (netMonthly >= 0 ? 'green' : 'red') : 'red'}
             sub={hasBorrower && hasLender ? `${overdueCount} overdue` : undefined}
           />
+        </div>
+      )}
+
+      {/* ── Monthly Expected vs Received chart ── */}
+      {showChart && (
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">
+            Monthly Summary — Last 6 Months
+          </p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={monthlyChartData} barCategoryGap="30%" barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => v >= 1000 ? `₹${(v / 1000).toFixed(0)}k` : `₹${v}`}
+                width={48}
+              />
+              <Tooltip
+                formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid #e2e8f0' }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+              {hasLender && (
+                <Bar dataKey="Expected" name="Expected" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              )}
+              {hasLender && (
+                <Bar dataKey="Received" name="Received" fill="#10b981" radius={[4, 4, 0, 0]} />
+              )}
+              {hasMediator && (
+                <Bar dataKey="Commission" name="Commission" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
 

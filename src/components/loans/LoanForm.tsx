@@ -7,7 +7,7 @@ import { useLoans } from '@/context/LoanContext';
 
 interface LoanFormProps {
   initialValues?: Loan;
-  onSubmit: (loan: Loan) => void;
+  onSubmit: (loan: Loan) => void | Promise<void>;
   onCancel: () => void;
   /** If set, borrower/mediator dropdowns are scoped to loans related to this phone */
   myPhone?: string;
@@ -73,6 +73,7 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
   });
 
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
+  const [saving, setSaving] = useState(false);
 
   // Separate display state so typing "24" doesn't immediately jump to "2"
   const [rateDisplay, setRateDisplay] = useState(() =>
@@ -147,17 +148,28 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
     if (form.loanType === 'Through Mediator' && !form.mediatorName.trim()) {
       errs.mediatorName = 'Required for mediator loans';
     }
+    if (form.mediatorCommissionPct < 0 || form.mediatorCommissionPct > 100) {
+      errs.mediatorCommissionPct = 'Must be between 0 and 100';
+    }
+    if (form.expectedTenureMonths < 0) {
+      errs.expectedTenureMonths = 'Cannot be negative';
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validate()) return;
-    const now = new Date().toISOString();
-    const loanId = initialValues?.loanId ?? generateLoanId(loans);
-    const loan = deriveLoanFields({ loanId, ...form, createdAt: initialValues?.createdAt ?? now });
-    onSubmit(loan);
+    if (!validate() || saving) return;
+    setSaving(true);
+    try {
+      const now = new Date().toISOString();
+      const loanId = initialValues?.loanId ?? generateLoanId(loans);
+      const loan = deriveLoanFields({ loanId, ...form, createdAt: initialValues?.createdAt ?? now });
+      await onSubmit(loan);
+    } finally {
+      setSaving(false);
+    }
   }
 
   const inputClass = (field: string) =>
@@ -182,7 +194,7 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Lender Name</label>
             <input
-              className={`${inputClass('lenderName')} ${defaultLenderPhone ? 'bg-slate-50 text-slate-500' : ''}`}
+              className={`${inputClass('lenderName')} ${lockLender ? 'bg-slate-50 text-slate-500' : ''}`}
               value={form.lenderName}
               onChange={(e) => set('lenderName', e.target.value)}
               placeholder="Who gave the money?"
@@ -192,7 +204,7 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Lender Phone</label>
             <input
-              className={`${inputClass('lenderPhone')} ${defaultLenderPhone ? 'bg-slate-50 text-slate-500' : ''}`}
+              className={`${inputClass('lenderPhone')} ${lockLender ? 'bg-slate-50 text-slate-500' : ''}`}
               value={form.lenderPhone}
               onChange={(e) => set('lenderPhone', e.target.value)}
               placeholder="10-digit number"
@@ -320,6 +332,7 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Expected Tenure (Months)</label>
             <input type="number" min="0" className={inputClass('expectedTenureMonths')} value={form.expectedTenureMonths || ''} onChange={(e) => set('expectedTenureMonths', parseInt(e.target.value) || 0)} />
+            {errors.expectedTenureMonths && <p className="text-red-500 text-xs mt-1">{errors.expectedTenureMonths}</p>}
           </div>
         </div>
       </fieldset>
@@ -367,6 +380,7 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Commission (% of Interest)</label>
                 <input type="number" min="0" max="100" step="0.1" className={inputClass('mediatorCommissionPct')} value={form.mediatorCommissionPct || ''} onChange={(e) => set('mediatorCommissionPct', parseFloat(e.target.value) || 0)} />
+                {errors.mediatorCommissionPct && <p className="text-red-500 text-xs mt-1">{errors.mediatorCommissionPct}</p>}
               </div>
             </div>
           </div>
@@ -415,8 +429,8 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
         <button type="button" onClick={onCancel} className="flex-1 sm:flex-none px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
           Cancel
         </button>
-        <button type="submit" className="flex-1 sm:flex-none px-5 py-2.5 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600">
-          {initialValues ? 'Update Loan' : 'Add Loan'}
+        <button type="submit" disabled={saving} className="flex-1 sm:flex-none px-5 py-2.5 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-60">
+          {saving ? 'Saving…' : initialValues ? 'Update Loan' : 'Add Loan'}
         </button>
       </div>
     </form>

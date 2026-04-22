@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Loan, LoanStatus } from '@/types';
 import { useLoans } from '@/context/LoanContext';
 import { usePayments } from '@/context/PaymentContext';
@@ -7,9 +7,11 @@ import { Modal } from '@/components/common/Modal';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { LoanForm } from '@/components/loans/LoanForm';
 import { LoanTable } from '@/components/loans/LoanTable';
+import { useAuth } from '@/context/AuthContext';
 
 export function LoansPage() {
   const { loans, addLoan, updateLoan, deleteLoan, setLoanStatus } = useLoans();
+  const { isAdmin, hasFullAccess, userPhone, displayName } = useAuth();
   const { deletePaymentsByLoan } = usePayments();
   const { showSuccess, showError } = useToast();
 
@@ -19,9 +21,9 @@ export function LoansPage() {
 
   async function handleAdd(loan: Loan) {
     try {
-      await addLoan(loan);
+      const added = await addLoan(loan);
       setShowForm(false);
-      showSuccess(`Loan ${loan.loanId} added for ${loan.borrowerName}`);
+      showSuccess(`Loan ${added.loanId} added for ${added.borrowerName}`);
     } catch {
       showError('Failed to add loan');
     }
@@ -58,6 +60,13 @@ export function LoansPage() {
     }
   }
 
+  // Phone users with hasFullAccess can edit/delete only loans they own (as lender)
+  const ownedLoanIds = useMemo(() => {
+    if (isAdmin) return undefined;           // admin acts on all
+    if (!hasFullAccess) return new Set<string>(); // view-only
+    return new Set(loans.filter((l) => l.lenderPhone === userPhone).map((l) => l.loanId));
+  }, [isAdmin, hasFullAccess, loans, userPhone]);
+
   const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
 
   return (
@@ -82,12 +91,21 @@ export function LoansPage() {
         onDelete={(id) => setDeletingLoanId(id)}
         onSetStatus={handleSetStatus}
         onAdd={() => setShowForm(true)}
+        readOnly={!isAdmin && !hasFullAccess}
+        ownedLoanIds={ownedLoanIds}
+        userPhone={userPhone}
       />
 
       {/* Add Modal */}
       {showForm && (
         <Modal title="Add New Loan" onClose={() => setShowForm(false)} size="xl">
-          <LoanForm onSubmit={handleAdd} onCancel={() => setShowForm(false)} />
+          <LoanForm
+            onSubmit={handleAdd}
+            onCancel={() => setShowForm(false)}
+            defaultLenderName={!isAdmin ? displayName : undefined}
+            defaultLenderPhone={!isAdmin ? userPhone : undefined}
+            lockLender={!isAdmin}
+          />
         </Modal>
       )}
 
@@ -98,6 +116,7 @@ export function LoansPage() {
             initialValues={editingLoan}
             onSubmit={handleUpdate}
             onCancel={() => setEditingLoan(undefined)}
+            lockLender={!isAdmin}
           />
         </Modal>
       )}

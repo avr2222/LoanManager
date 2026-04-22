@@ -64,7 +64,7 @@ export function ForgotPasswordModal({ phone: initialPhone, onClose, onSuccess }:
 
     const { data } = await supabase.rpc('phone_forgot_password', {
       p_phone:        phone,
-      p_answer:       answer.trim(),
+      p_answer:       answer.trim().toLowerCase(),
       p_new_password: newPassword,
     });
 

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { profilesService, type Profile } from '@/services/profilesService';
@@ -37,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile]               = useState<Profile | null>(null);
   const [loading, setLoading]               = useState(true);
   const [needsPasswordReset, setNeedsPasswordReset] = useState(false);
+  const initializedRef = useRef(false);
 
   async function loadProfile(u: User | null) {
     if (!u) { setProfile(null); return; }
@@ -48,7 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      loadProfile(session?.user ?? null).finally(() => setLoading(false));
+      loadProfile(session?.user ?? null).finally(() => {
+        initializedRef.current = true;
+        setLoading(false);
+      });
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -56,7 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (event === 'PASSWORD_RECOVERY') setNeedsPasswordReset(true);
       loadProfile(session?.user ?? null);
-      setLoading(false);
+      // Only update loading after initial getSession() has resolved to avoid flicker
+      if (initializedRef.current) setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -86,26 +91,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: 'Incorrect password. Use "Forgot password?" if you need to reset it.' };
     }
 
-    // No password — try with phone-as-default password (view-only mode)
+    // No password — try with phone-as-default password (view-only / first-time mode)
     const { error: e1 } = await supabase.auth.signInWithPassword({ email, password: cleaned });
     if (!e1) return { error: null };
 
-    // Account may not exist yet — provision it
-    const { error: signUpError } = await supabase.auth.signUp({ email, password: cleaned });
-    if (signUpError && signUpError.message?.toLowerCase().includes('already registered')) {
-      // Account exists but password has been changed — they must enter their password
-      return { error: 'password_required' };
-    }
-
-    // Try again after signup
-    const { error: e2 } = await supabase.auth.signInWithPassword({ email, password: cleaned });
-    if (!e2) return { error: null };
-
-    if (e2.message?.toLowerCase().includes('email not confirmed')) {
+    // First attempt failed — account either has a custom password or doesn't exist
+    // Never call signUp here: doing so would reset an existing custom password (security hole)
+    if (e1.message?.toLowerCase().includes('email not confirmed')) {
       return { error: 'Login blocked by email confirmation. Go to Supabase → Auth → Settings and disable "Enable email confirmations".' };
     }
 
-    return { error: 'Phone number not found. Ask your lender to add your number to their loans.' };
+    // Distinguish: if they've likely set a custom password vs. account doesn't exist
+    // We can't tell from the error alone, so show a helpful message with both options
+    return { error: 'password_required' };
   }, []);
 
   const signOut = useCallback(async () => {
@@ -133,11 +131,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error) return { error: error.message };
 
-    // Save security Q&A to profiles table
+    // Save security Q&A to profiles table — normalize answer for consistent comparison
     if (data.user) {
       await supabase
         .from('profiles')
-        .update({ security_question: question, security_answer: answer })
+        .update({ security_question: question, security_answer: answer.trim().toLowerCase() })
         .eq('id', data.user.id);
       setUser(data.user);
     }

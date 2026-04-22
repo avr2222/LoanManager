@@ -11,13 +11,27 @@ interface LoanTableProps {
   onDelete: (loanId: string) => void;
   onSetStatus: (loanId: string, status: LoanStatus) => void;
   onAdd: () => void;
+  readOnly?: boolean;
+  /** undefined = admin (all loans); empty Set = none; Set with ids = owned loans */
+  ownedLoanIds?: Set<string>;
+  /** Phone of the logged-in user — used to show "From: Lender" when user is the mediator */
+  userPhone?: string;
 }
 
 type SortKey = 'loanId' | 'borrowerName' | 'principalAmount' | 'monthlyInterestAmount' | 'loanStatus' | 'dateGiven';
 
-export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd }: LoanTableProps) {
+export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnly, ownedLoanIds, userPhone }: LoanTableProps) {
+  const canAct = (loan: Loan) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(loan.loanId));
+
+  // For mediators viewing their own loans, show lender name ("From: X") instead of their own name
+  function loanTypeLabel(loan: Loan): string {
+    if (loan.loanType !== 'Through Mediator') return 'Direct';
+    const isSelf = userPhone && loan.mediatorPhone === userPhone;
+    if (isSelf) return `From: ${loan.lenderName || 'Admin'}`;
+    return `Via: ${loan.mediatorName || 'Mediator'}`;
+  }
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<LoanStatus | 'All'>('All');
+  const [statusFilter, setStatusFilter] = useState<LoanStatus | 'All'>('Active');
   const [sortKey, setSortKey] = useState<SortKey>('loanId');
   const [sortAsc, setSortAsc] = useState(true);
   const [page, setPage] = useState(1);
@@ -92,14 +106,16 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd }: LoanT
           <option value="Defaulted">Defaulted</option>
           <option value="Restructured">Restructured</option>
         </select>
-        <button
-          onClick={onAdd}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 shrink-0"
-        >
-          <Plus size={15} />
-          <span className="hidden sm:inline">Add Loan</span>
-          <span className="sm:hidden">Add</span>
-        </button>
+        {!readOnly && (
+          <button
+            onClick={onAdd}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 shrink-0"
+          >
+            <Plus size={15} />
+            <span className="hidden sm:inline">Add Loan</span>
+            <span className="sm:hidden">Add</span>
+          </button>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -121,13 +137,15 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd }: LoanT
                     <p className="text-sm font-semibold text-slate-900">{loan.borrowerName}</p>
                     <p className="text-xs text-slate-400">{loan.borrowerPhone}</p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => onEdit(loan)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={15} /></button>
-                    {loan.loanStatus === 'Active' && (
-                      <button onClick={() => onSetStatus(loan.loanId, 'Closed')} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg" title="Close loan"><XCircle size={15} /></button>
-                    )}
-                    <button onClick={() => onDelete(loan.loanId)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={15} /></button>
-                  </div>
+                  {canAct(loan) && (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => onEdit(loan)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={15} /></button>
+                      {loan.loanStatus === 'Active' && (
+                        <button onClick={() => onSetStatus(loan.loanId, 'Closed')} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg" title="Close loan"><XCircle size={15} /></button>
+                      )}
+                      <button onClick={() => onDelete(loan.loanId)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={15} /></button>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs mt-3 pt-3 border-t border-slate-50">
                   <div>
@@ -145,6 +163,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd }: LoanT
                 </div>
                 <div className="flex items-center justify-between mt-2 text-xs text-slate-400">
                   <span>Given: {formatDate(loan.dateGiven)}</span>
+                  <span>{loanTypeLabel(loan)}</span>
                   <StatusBadge status={loan.loanStatus} />
                 </div>
               </div>
@@ -165,7 +184,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd }: LoanT
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Net Receipt</th>
                     <th className={thClass} onClick={() => toggleSort('dateGiven')}><span className="flex items-center gap-1">Date Given <SortIcon col="dateGiven" /></span></th>
                     <th className={thClass} onClick={() => toggleSort('loanStatus')}><span className="flex items-center gap-1">Status <SortIcon col="loanStatus" /></span></th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Actions</th>
+                    {!readOnly && <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -177,7 +196,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd }: LoanT
                         <div className="text-xs text-slate-400">{loan.borrowerPhone}</div>
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-500">
-                        {loan.loanType === 'Through Mediator' ? <span title={loan.mediatorName}>Via: {loan.mediatorName || 'Mediator'}</span> : 'Direct'}
+                        {loanTypeLabel(loan)}
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-slate-800">{formatCurrency(loan.principalAmount)}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{formatCurrency(loan.monthlyInterestAmount)}</td>
@@ -185,6 +204,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd }: LoanT
                       <td className="px-4 py-3 text-sm text-slate-600">{formatDate(loan.dateGiven)}</td>
                       <td className="px-4 py-3"><StatusBadge status={loan.loanStatus} /></td>
                       <td className="px-4 py-3">
+                        {canAct(loan) && (
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => onEdit(loan)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg" title="Edit"><Edit2 size={14} /></button>
                           {loan.loanStatus === 'Active' && (
@@ -192,6 +212,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd }: LoanT
                           )}
                           <button onClick={() => onDelete(loan.loanId)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 size={14} /></button>
                         </div>
+                        )}
                       </td>
                     </tr>
                   ))}

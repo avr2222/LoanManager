@@ -61,7 +61,7 @@ export function LoginPage() {
 
     if (authError === 'password_required') {
       setPasswordRequired(true);
-      setError('You have set a custom password. Please enter it below.');
+      setError('Enter your password to sign in, or use "Forgot password?" to reset it.');
       setTimeout(() => passwordRef.current?.focus(), 50);
     } else if (authError) {
       setError(authError);

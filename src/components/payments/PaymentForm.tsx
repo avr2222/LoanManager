@@ -8,7 +8,7 @@ import { getDueDateForMonth, toISODateString } from '@/utils/dateUtils';
 interface PaymentFormProps {
   initialValues?: Payment;
   defaultLoanId?: string;
-  onSubmit: (payment: Payment) => void;
+  onSubmit: (payment: Payment) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -26,6 +26,7 @@ export function PaymentForm({ initialValues, defaultLoanId, onSubmit, onCancel }
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(initialValues?.paymentStatus ?? 'Pending');
   const [remarks, setRemarks] = useState(initialValues?.remarks ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   const selectedLoan = loans.find((l) => l.loanId === loanId);
 
@@ -59,9 +60,10 @@ export function PaymentForm({ initialValues, defaultLoanId, onSubmit, onCancel }
     return Object.keys(errs).length === 0;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validate() || !selectedLoan) return;
+    if (!validate() || !selectedLoan || saving) return;
+    setSaving(true);
 
     const [mon, yr] = monthYear.split('-');
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -103,7 +105,11 @@ export function PaymentForm({ initialValues, defaultLoanId, onSubmit, onCancel }
       updatedAt: nowStr,
     };
 
-    onSubmit(payment);
+    try {
+      await onSubmit(payment);
+    } finally {
+      setSaving(false);
+    }
   }
 
   const inputClass = (field: string) =>
@@ -211,8 +217,8 @@ export function PaymentForm({ initialValues, defaultLoanId, onSubmit, onCancel }
         <button type="button" onClick={onCancel} className="flex-1 sm:flex-none px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
           Cancel
         </button>
-        <button type="submit" className="flex-1 sm:flex-none px-5 py-2.5 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600">
-          {initialValues ? 'Update Payment' : 'Record Payment'}
+        <button type="submit" disabled={saving} className="flex-1 sm:flex-none px-5 py-2.5 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-60">
+          {saving ? 'Saving…' : initialValues ? 'Update Payment' : 'Record Payment'}
         </button>
       </div>
     </form>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -13,6 +14,7 @@ const SECURITY_QUESTIONS = [
 
 export function SetPasswordPage() {
   const { updatePasswordWithSecurity, signOut, userPhone } = useAuth();
+  const navigate = useNavigate();
 
   const [password, setPassword]       = useState('');
   const [confirm, setConfirm]         = useState('');
@@ -34,9 +36,9 @@ export function SetPasswordPage() {
     const { error: err } = await updatePasswordWithSecurity(password, question, answer.trim());
     setSaving(false);
 
-    if (err) setError(err);
-    // On success AuthContext sets password_changed=true → needsFirstTimeSetup becomes false
-    // → AuthGuard stops showing this page automatically
+    if (err) { setError(err); return; }
+    // On success, navigate back to dashboard with full access
+    navigate('/dashboard', { replace: true });
   }
 
   return (
@@ -140,13 +142,14 @@ export function SetPasswordPage() {
               {saving ? 'Saving…' : 'Set Password & Continue'}
             </button>
 
-            <button
-              type="button"
-              onClick={signOut}
-              className="w-full text-xs text-slate-400 hover:text-slate-600 py-1 transition-colors"
-            >
-              Sign out
-            </button>
+            <div className="flex justify-between text-xs text-slate-400 pt-1">
+              <button type="button" onClick={() => navigate('/dashboard')} className="hover:text-slate-600 transition-colors">
+                Maybe later
+              </button>
+              <button type="button" onClick={signOut} className="hover:text-slate-600 transition-colors">
+                Sign out
+              </button>
+            </div>
           </form>
         </div>
 

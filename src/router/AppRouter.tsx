@@ -11,7 +11,7 @@ import { SetPasswordPage } from '@/pages/SetPasswordPage';
 import { useAuth } from '@/context/AuthContext';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, needsPasswordReset, needsFirstTimeSetup } = useAuth();
+  const { user, loading, needsPasswordReset } = useAuth();
 
   if (loading) {
     return (
@@ -22,7 +22,6 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (needsPasswordReset)   return <ResetPasswordPage />;
-  if (needsFirstTimeSetup)  return <SetPasswordPage />;
   if (!user)                return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -53,11 +52,12 @@ export function AppRouter() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<MediatorDashboardPage />} />
-          <Route path="add-loan"  element={<FullAccessOnly><AddLoanPage /></FullAccessOnly>} />
-          <Route path="loans"     element={<AdminOnly><LoansPage /></AdminOnly>} />
-          <Route path="payments"  element={<AdminOnly><PaymentsPage /></AdminOnly>} />
-          <Route path="import"    element={<AdminOnly><ImportPage /></AdminOnly>} />
+          <Route path="dashboard"    element={<MediatorDashboardPage />} />
+          <Route path="set-password" element={<SetPasswordPage />} />
+          <Route path="add-loan"     element={<FullAccessOnly><AddLoanPage /></FullAccessOnly>} />
+          <Route path="loans"        element={<LoansPage />} />
+          <Route path="payments"     element={<PaymentsPage />} />
+          <Route path="import"       element={<AdminOnly><ImportPage /></AdminOnly>} />
         </Route>
       </Routes>
     </HashRouter>

@@ -3,17 +3,23 @@ import type { Loan, Payment } from '@/types';
 
 // ── Column mapping helpers ────────────────────────────────────────────────────
 
+/** Strip non-digits and keep last 10 digits. Returns '' if input is blank. */
+function normalizePhone(phone?: string | null): string {
+  if (!phone) return '';
+  return phone.replace(/\D/g, '').slice(-10);
+}
+
 function toDbLoan(l: Loan): Record<string, unknown> {
   return {
     loan_id: l.loanId,
     lender_name: l.lenderName ?? '',
-    lender_phone: l.lenderPhone ?? '',
+    lender_phone: normalizePhone(l.lenderPhone),
     borrower_name: l.borrowerName,
-    borrower_phone: l.borrowerPhone,
+    borrower_phone: normalizePhone(l.borrowerPhone),
     borrower_address: l.borrowerAddress,
     loan_type: l.loanType,
     mediator_name: l.mediatorName,
-    mediator_phone: l.mediatorPhone,
+    mediator_phone: normalizePhone(l.mediatorPhone),
     mediator_commission_pct: l.mediatorCommissionPct,
     principal_amount: l.principalAmount,
     annual_interest_rate: l.annualInterestRate,
@@ -129,6 +135,22 @@ export const loansService = {
     if (error) throw error;
   },
 
+  async deleteAll(): Promise<void> {
+    const { error } = await supabase.from('loans').delete().neq('loan_id', '');
+    if (error) throw error;
+  },
+
+  /** Returns the next sequential loan ID (e.g. "L026") using a SECURITY DEFINER
+   *  RPC so phone users — who can't see all loans via RLS — get the correct global max. */
+  async getNextLoanId(): Promise<string> {
+    const { data, error } = await supabase.rpc('get_next_loan_id');
+    if (error || !data) {
+      // Fallback: timestamp-based ID avoids collisions if RPC not yet deployed
+      return `L${Date.now()}`;
+    }
+    return data as string;
+  },
+
   // Fill in admin's real name on all loans that have no lender name set
   async fillBlankLenderName(name: string): Promise<void> {
     if (!name) return;
@@ -175,6 +197,11 @@ export const paymentsService = {
 
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('payments').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async deleteAll(): Promise<void> {
+    const { error } = await supabase.from('payments').delete().neq('id', '');
     if (error) throw error;
   },
 
