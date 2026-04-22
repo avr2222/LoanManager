@@ -1,6 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/common/AppShell';
-import { DashboardPage } from '@/pages/DashboardPage';
 import { MediatorDashboardPage } from '@/pages/MediatorDashboardPage';
 import { AddLoanPage } from '@/pages/AddLoanPage';
 import { LoansPage } from '@/pages/LoansPage';
@@ -41,13 +40,6 @@ function FullAccessOnly({ children }: { children: React.ReactNode }) {
 }
 
 export function AppRouter() {
-  const { isMediator, isBorrower } = useAuth();
-
-  function DashboardView() {
-    if (isMediator || isBorrower) return <MediatorDashboardPage />;
-    return <DashboardPage />;
-  }
-
   return (
     <HashRouter>
       <Routes>
@@ -61,7 +53,7 @@ export function AppRouter() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardView />} />
+          <Route path="dashboard" element={<MediatorDashboardPage />} />
           <Route path="add-loan"  element={<FullAccessOnly><AddLoanPage /></FullAccessOnly>} />
           <Route path="loans"     element={<AdminOnly><LoansPage /></AdminOnly>} />
           <Route path="payments"  element={<AdminOnly><PaymentsPage /></AdminOnly>} />

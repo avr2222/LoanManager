@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, ArrowRight, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
+import { Plus, FileText, ArrowRight, ChevronDown, ChevronUp, CheckCircle2, Users, X } from 'lucide-react';
 import { useLoans } from '@/context/LoanContext';
 import type { Loan } from '@/types';
 import { usePayments } from '@/context/PaymentContext';
@@ -55,38 +55,49 @@ interface BorrowerGroup {
   totalReceipt: number;    // net receipt (lender) or 0
 }
 
-interface MediatorDashboardPageProps {
-  viewAsPhone?: string;
-  viewAsName?: string;
-  onExitViewAs?: () => void;
-}
-
-export function MediatorDashboardPage({ viewAsPhone, viewAsName, onExitViewAs }: MediatorDashboardPageProps) {
+export function MediatorDashboardPage() {
   const { loans } = useLoans();
   const { payments, updatePayment } = usePayments();
   const { userPhone, hasFullAccess, isAdmin } = useAuth();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const [showClosedLoans, setShowClosedLoans] = useState(false);
+  const [viewAsPhone, setViewAsPhone]         = useState('');
+  const [viewAsName, setViewAsName]           = useState('');
+  const [showUserPicker, setShowUserPicker]   = useState(false);
 
   const isViewAs = !!viewAsPhone;
 
+  // Admin (no view-as): sees ALL loans as lender. Phone users: filtered by own phone.
   const myPhone = norm(viewAsPhone || userPhone);
 
-  const borrowerLoans = useMemo(() =>
-    loans.filter((l) => norm(l.borrowerPhone) === myPhone),
-    [loans, myPhone]
-  );
+  const borrowerLoans = useMemo(() => {
+    if (isAdmin && !isViewAs) return [];
+    return loans.filter((l) => norm(l.borrowerPhone) === myPhone);
+  }, [loans, myPhone, isAdmin, isViewAs]);
 
-  const mediatorLoans = useMemo(() =>
-    loans.filter((l) => l.loanType === 'Through Mediator' && norm(l.mediatorPhone ?? '') === myPhone),
-    [loans, myPhone]
-  );
+  const mediatorLoans = useMemo(() => {
+    if (isAdmin && !isViewAs) return [];
+    return loans.filter((l) => l.loanType === 'Through Mediator' && norm(l.mediatorPhone ?? '') === myPhone);
+  }, [loans, myPhone, isAdmin, isViewAs]);
 
-  const lenderLoans = useMemo(() =>
-    loans.filter((l) => l.lenderPhone && norm(l.lenderPhone) === myPhone),
-    [loans, myPhone]
-  );
+  const lenderLoans = useMemo(() => {
+    if (isAdmin && !isViewAs) return loans; // admin owns all loans
+    return loans.filter((l) => l.lenderPhone && norm(l.lenderPhone) === myPhone);
+  }, [loans, myPhone, isAdmin, isViewAs]);
+
+  // Known phone users for admin "View As" picker
+  const knownUsers = useMemo(() => {
+    if (!isAdmin) return [];
+    const map = new Map<string, string>();
+    for (const l of loans) {
+      if (l.borrowerPhone) map.set(norm(l.borrowerPhone), l.borrowerName);
+      if (l.mediatorPhone) map.set(norm(l.mediatorPhone), l.mediatorName || l.mediatorPhone);
+    }
+    return Array.from(map.entries())
+      .map(([phone, name]) => ({ phone, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [loans, isAdmin]);
 
   // Group mediator loans by borrower (for consolidated view)
   const mediatorByBorrower = useMemo<BorrowerGroup[]>(() => {
@@ -126,10 +137,10 @@ export function MediatorDashboardPage({ viewAsPhone, viewAsName, onExitViewAs }:
     [borrowerLoans, mediatorLoans, lenderLoans]
   );
 
-  const myPayments = useMemo(() =>
-    payments.filter((p) => allMyLoanIds.has(p.loanId)),
-    [payments, allMyLoanIds]
-  );
+  const myPayments = useMemo(() => {
+    if (isAdmin && !isViewAs) return payments; // admin sees all payments
+    return payments.filter((p) => allMyLoanIds.has(p.loanId));
+  }, [payments, allMyLoanIds, isAdmin, isViewAs]);
 
   // KPI amounts — Active loans only
   const activeBorrower = borrowerLoans.filter((l) => l.loanStatus === 'Active');
@@ -188,7 +199,7 @@ export function MediatorDashboardPage({ viewAsPhone, viewAsName, onExitViewAs }:
             <span>{viewAsName} ({viewAsPhone})</span>
           </div>
           <button
-            onClick={onExitViewAs}
+            onClick={() => { setViewAsPhone(''); setViewAsName(''); }}
             className="text-xs font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
           >
             ← Back to My Dashboard
@@ -198,7 +209,7 @@ export function MediatorDashboardPage({ viewAsPhone, viewAsName, onExitViewAs }:
 
       {/* View-only banner for phone users who haven't set a password */}
       {!isViewAs && !hasFullAccess && !isAdmin && (
-        <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 gap-3">
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
           <p className="text-sm text-indigo-700">
             <span className="font-semibold">View-only mode.</span> Sign out and log in with your password to add loans or mark payments.
           </p>
@@ -207,15 +218,24 @@ export function MediatorDashboardPage({ viewAsPhone, viewAsName, onExitViewAs }:
 
       {/* Header action row */}
       <div className="flex items-center justify-between gap-2">
-        {!isViewAs && hasFullAccess && (
-          <button
-            onClick={() => navigate('/add-loan')}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 active:scale-95 transition-all shadow-sm"
-          >
-            <Plus size={16} /> Add Loan
-          </button>
-        )}
-        {!isViewAs && <span />}
+        <div className="flex items-center gap-2">
+          {!isViewAs && hasFullAccess && (
+            <button
+              onClick={() => navigate('/add-loan')}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 active:scale-95 transition-all shadow-sm"
+            >
+              <Plus size={16} /> Add Loan
+            </button>
+          )}
+          {isAdmin && !isViewAs && knownUsers.length > 0 && (
+            <button
+              onClick={() => setShowUserPicker(true)}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors"
+            >
+              <Users size={15} /> View as User
+            </button>
+          )}
+        </div>
         {(hasBorrower || hasMediator || hasLender) && (
           <button
             onClick={handleDownloadPDF}
@@ -694,6 +714,40 @@ export function MediatorDashboardPage({ viewAsPhone, viewAsName, onExitViewAs }:
       )}
 
       <div className="h-4" />
+
+      {/* View As User picker — admin only */}
+      {showUserPicker && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/40" onClick={() => setShowUserPicker(false)} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm z-10">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <h2 className="text-base font-semibold text-slate-800">View as User</h2>
+                <button onClick={() => setShowUserPicker(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-2 max-h-80 overflow-y-auto">
+                {knownUsers.map(({ phone, name }) => (
+                  <button
+                    key={phone}
+                    onClick={() => { setViewAsPhone(phone); setViewAsName(name); setShowUserPicker(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-semibold shrink-0">
+                      {name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{name}</p>
+                      <p className="text-xs text-slate-400">{phone}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

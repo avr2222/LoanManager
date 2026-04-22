@@ -59,7 +59,6 @@ export function DashboardPage() {
   const { displayName } = useAuth();
   const navigate = useNavigate();
   const [viewAsPhone, setViewAsPhone] = useState('');
-  const [viewAsName, setViewAsName] = useState('');
   const [showUserPicker, setShowUserPicker] = useState(false);
   const kpis = useMemo(() => computeKPIs(loans, payments), [loans, payments]);
 
@@ -123,13 +122,7 @@ export function DashboardPage() {
 
   // Render the selected user's dashboard
   if (viewAsPhone) {
-    return (
-      <MediatorDashboardPage
-        viewAsPhone={viewAsPhone}
-        viewAsName={viewAsName}
-        onExitViewAs={() => { setViewAsPhone(''); setViewAsName(''); }}
-      />
-    );
+    return <MediatorDashboardPage />;
   }
 
   return (
@@ -320,7 +313,7 @@ export function DashboardPage() {
                 {knownUsers.map(({ phone, name }) => (
                   <button
                     key={phone}
-                    onClick={() => { setViewAsPhone(phone); setViewAsName(name); setShowUserPicker(false); }}
+                    onClick={() => { setViewAsPhone(phone); setShowUserPicker(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-slate-50 transition-colors"
                   >
                     <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-semibold shrink-0">
