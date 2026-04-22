@@ -200,9 +200,6 @@ export function MediatorDashboardPage() {
     });
   }, [myPayments, lenderLoanIds, mediatorLoans]);
 
-  const showChart = (hasLender || hasMediator) &&
-    monthlyChartData.some((d) => d.Expected > 0 || d.Commission > 0);
-
   async function handleMarkReceived(paymentId: string) {
     const payment = myPayments.find((p) => p.id === paymentId);
     if (!payment) return;
@@ -224,6 +221,9 @@ export function MediatorDashboardPage() {
   const hasBorrower = borrowerLoans.length > 0;
   const hasMediator = mediatorLoans.length > 0;
   const hasLender   = lenderLoans.length > 0;
+
+  const showChart = (hasLender || hasMediator) &&
+    monthlyChartData.some((d) => d.Expected > 0 || d.Commission > 0);
 
   function handleDownloadPDF() {
     const name = viewAsName || userPhone;
@@ -355,7 +355,7 @@ export function MediatorDashboardPage() {
                 width={48}
               />
               <Tooltip
-                formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                formatter={(value, name) => [formatCurrency(typeof value === 'number' ? value : 0), String(name ?? '')]}
                 contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid #e2e8f0' }}
               />
               <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
