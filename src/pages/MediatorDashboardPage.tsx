@@ -64,7 +64,7 @@ interface MediatorDashboardPageProps {
 export function MediatorDashboardPage({ viewAsPhone, viewAsName, onExitViewAs }: MediatorDashboardPageProps) {
   const { loans } = useLoans();
   const { payments, updatePayment } = usePayments();
-  const { userPhone } = useAuth();
+  const { userPhone, hasFullAccess, isAdmin } = useAuth();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const [showClosedLoans, setShowClosedLoans] = useState(false);
@@ -196,9 +196,18 @@ export function MediatorDashboardPage({ viewAsPhone, viewAsName, onExitViewAs }:
         </div>
       )}
 
+      {/* View-only banner for phone users who haven't set a password */}
+      {!isViewAs && !hasFullAccess && !isAdmin && (
+        <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 gap-3">
+          <p className="text-sm text-indigo-700">
+            <span className="font-semibold">View-only mode.</span> Sign out and log in with your password to add loans or mark payments.
+          </p>
+        </div>
+      )}
+
       {/* Header action row */}
       <div className="flex items-center justify-between gap-2">
-        {!isViewAs && (
+        {!isViewAs && hasFullAccess && (
           <button
             onClick={() => navigate('/add-loan')}
             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 active:scale-95 transition-all shadow-sm"
@@ -615,7 +624,7 @@ export function MediatorDashboardPage({ viewAsPhone, viewAsName, onExitViewAs }:
                     <p className="text-xs text-slate-400">Due {formatDate(p.dueDate)}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {lenderLoanIds.has(p.loanId) && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && (
+                    {hasFullAccess && lenderLoanIds.has(p.loanId) && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && (
                       <button onClick={() => handleMarkReceived(p.id)}
                         className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-2.5 py-1.5 rounded-lg transition-all shadow-sm">
                         <CheckCircle2 size={13} />
@@ -657,7 +666,7 @@ export function MediatorDashboardPage({ viewAsPhone, viewAsName, onExitViewAs }:
                       </div>
                     </td>
                     <td className="px-5 py-3">
-                      {lenderLoanIds.has(p.loanId) && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && (
+                      {hasFullAccess && lenderLoanIds.has(p.loanId) && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && (
                         <button onClick={() => handleMarkReceived(p.id)}
                           className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
                           <CheckCircle2 size={13} /> Mark Received
