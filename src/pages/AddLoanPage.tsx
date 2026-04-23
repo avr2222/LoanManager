@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLoans } from '@/context/LoanContext';
 import { useAuth } from '@/context/AuthContext';
@@ -13,7 +14,8 @@ export function AddLoanPage() {
   const { showSuccess, showError } = useToast();
 
   const myPhone = userPhone.replace(/\D/g, '').slice(-10);
-  const lenderPhone = isAdmin ? adminPhone : userPhone;
+  // Phone users pick whether they are adding as lender or mediator
+  const [myRole, setMyRole] = useState<'lender' | 'mediator'>('lender');
 
   async function handleSubmit(loan: Loan) {
     try {
@@ -35,15 +37,49 @@ export function AddLoanPage() {
       </button>
 
       <div className="bg-white rounded-2xl border border-slate-100 p-5">
-        <h2 className="text-base font-semibold text-slate-800 mb-5">Add New Loan</h2>
-        <LoanForm
-          onSubmit={handleSubmit}
-          onCancel={() => navigate('/dashboard')}
-          myPhone={myPhone}
-          defaultLenderName={displayName || userPhone}
-          defaultLenderPhone={lenderPhone}
-          lockLender={!isAdmin}
-        />
+        <h2 className="text-base font-semibold text-slate-800 mb-4">Add New Loan</h2>
+
+        {/* Role toggle — only for phone users */}
+        {!isAdmin && (
+          <div className="flex gap-2 mb-5 p-1 bg-slate-100 rounded-xl w-fit">
+            {(['lender', 'mediator'] as const).map((role) => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => setMyRole(role)}
+                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors capitalize ${
+                  myRole === role
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                I am the {role}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {myRole === 'lender' || isAdmin ? (
+          <LoanForm
+            key="lender"
+            onSubmit={handleSubmit}
+            onCancel={() => navigate('/dashboard')}
+            myPhone={myPhone}
+            defaultLenderName={isAdmin ? (adminPhone ? displayName : '') : displayName || userPhone}
+            defaultLenderPhone={isAdmin ? adminPhone : userPhone}
+            lockLender={!isAdmin}
+          />
+        ) : (
+          <LoanForm
+            key="mediator"
+            onSubmit={handleSubmit}
+            onCancel={() => navigate('/dashboard')}
+            myPhone={myPhone}
+            defaultMediatorName={displayName || userPhone}
+            defaultMediatorPhone={userPhone}
+            lockMediator
+          />
+        )}
       </div>
     </div>
   );

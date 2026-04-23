@@ -16,6 +16,11 @@ interface LoanFormProps {
   defaultLenderPhone?: string;
   /** If true, lender fields are read-only (phone users). Admin always gets editable fields. */
   lockLender?: boolean;
+  /** Pre-fill the mediator fields (when the logged-in user is the mediator) */
+  defaultMediatorName?: string;
+  defaultMediatorPhone?: string;
+  /** If true, mediator fields are read-only and loan type is forced to Through Mediator */
+  lockMediator?: boolean;
 }
 
 const defaultForm = {
@@ -36,7 +41,7 @@ const defaultForm = {
   remarks: '',
 };
 
-export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLenderName, defaultLenderPhone, lockLender }: LoanFormProps) {
+export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLenderName, defaultLenderPhone, lockLender, defaultMediatorName, defaultMediatorPhone, lockMediator }: LoanFormProps) {
   const { loans } = useLoans();
 
   // If myPhone is given (phone user), only suggest people from their own loans
@@ -68,8 +73,12 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
     remarks: initialValues.remarks,
   } : {
     ...defaultForm,
-    lenderName:  defaultLenderName  ?? '',
-    lenderPhone: defaultLenderPhone ?? '',
+    lenderName:    defaultLenderName    ?? '',
+    lenderPhone:   defaultLenderPhone   ?? '',
+    mediatorName:  defaultMediatorName  ?? '',
+    mediatorPhone: defaultMediatorPhone ?? '',
+    // force Through Mediator when the logged-in user is the mediator
+    loanType: lockMediator ? 'Through Mediator' as LoanType : 'Direct' as LoanType,
   });
 
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
@@ -274,7 +283,12 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Loan Type *</label>
-            <select className={inputClass('loanType')} value={form.loanType} onChange={(e) => set('loanType', e.target.value as LoanType)}>
+            <select
+              className={`${inputClass('loanType')} ${lockMediator ? 'bg-slate-50 text-slate-500' : ''}`}
+              value={form.loanType}
+              onChange={(e) => set('loanType', e.target.value as LoanType)}
+              disabled={!!lockMediator}
+            >
               <option value="Direct">Direct</option>
               <option value="Through Mediator">Through Mediator</option>
             </select>
@@ -341,7 +355,8 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
       {form.loanType === 'Through Mediator' && (
         <fieldset>
           <legend className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 pb-1 border-b border-slate-100 w-full">
-            Mediator Details
+            Mediator Details{' '}
+            {lockMediator && <span className="normal-case font-normal text-emerald-500 ml-1">— you are the mediator</span>}
           </legend>
           <div className="space-y-3">
 
@@ -370,12 +385,24 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Mediator Name *</label>
-                <input className={inputClass('mediatorName')} value={form.mediatorName} onChange={(e) => set('mediatorName', e.target.value)} placeholder="Enter mediator name" />
+                <input
+                  className={`${inputClass('mediatorName')} ${lockMediator ? 'bg-slate-50 text-slate-500' : ''}`}
+                  value={form.mediatorName}
+                  onChange={(e) => set('mediatorName', e.target.value)}
+                  placeholder="Enter mediator name"
+                  readOnly={!!lockMediator}
+                />
                 {errors.mediatorName && <p className="text-red-500 text-xs mt-1">{errors.mediatorName}</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Mediator Phone</label>
-                <input className={inputClass('mediatorPhone')} value={form.mediatorPhone} onChange={(e) => set('mediatorPhone', e.target.value)} placeholder="10-digit number" />
+                <input
+                  className={`${inputClass('mediatorPhone')} ${lockMediator ? 'bg-slate-50 text-slate-500' : ''}`}
+                  value={form.mediatorPhone}
+                  onChange={(e) => set('mediatorPhone', e.target.value)}
+                  placeholder="10-digit number"
+                  readOnly={!!lockMediator}
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Commission (% of Interest)</label>
