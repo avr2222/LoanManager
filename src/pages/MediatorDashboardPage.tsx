@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, ArrowRight, ChevronDown, ChevronUp, CheckCircle2, Users, X } from 'lucide-react';
+import { Plus, FileText, ArrowRight, ChevronDown, ChevronUp, CheckCircle2, Users, X, Pencil, Trash2 } from 'lucide-react';
+import { Modal } from '@/components/common/Modal';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { LoanForm } from '@/components/loans/LoanForm';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useLoans } from '@/context/LoanContext';
 import type { Loan } from '@/types';
@@ -57,15 +60,17 @@ interface BorrowerGroup {
 }
 
 export function MediatorDashboardPage() {
-  const { loans } = useLoans();
-  const { payments, updatePayment } = usePayments();
+  const { loans, updateLoan, deleteLoan } = useLoans();
+  const { payments, updatePayment, deletePaymentsByLoan } = usePayments();
   const { userPhone, hasFullAccess, isAdmin } = useAuth();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
-  const [showClosedLoans, setShowClosedLoans] = useState(false);
-  const [viewAsPhone, setViewAsPhone]         = useState('');
-  const [viewAsName, setViewAsName]           = useState('');
-  const [showUserPicker, setShowUserPicker]   = useState(false);
+  const [showClosedLoans, setShowClosedLoans]   = useState(false);
+  const [viewAsPhone, setViewAsPhone]           = useState('');
+  const [viewAsName, setViewAsName]             = useState('');
+  const [showUserPicker, setShowUserPicker]     = useState(false);
+  const [editingLoan, setEditingLoan]           = useState<Loan | undefined>();
+  const [deletingLoanId, setDeletingLoanId]     = useState<string | null>(null);
 
   const isViewAs = !!viewAsPhone;
 
@@ -162,6 +167,10 @@ export function MediatorDashboardPage() {
   // Loans where I am the borrower — show full interest amount and "Paid" label
   const borrowerLoanIds = useMemo(() => new Set(borrowerLoans.map((l) => l.loanId)), [borrowerLoans]);
 
+  const hasBorrower = borrowerLoans.length > 0;
+  const hasMediator = mediatorLoans.length > 0;
+  const hasLender   = lenderLoans.length > 0;
+
   // ── Monthly Expected vs Received chart (last 6 months) ──────
   const monthlyChartData = useMemo(() => {
     const now = new Date();
@@ -203,6 +212,30 @@ export function MediatorDashboardPage() {
   const showChart = (hasLender || hasMediator) &&
     monthlyChartData.some((d) => d.Expected > 0 || d.Commission > 0);
 
+  async function handleUpdateLoan(loan: Loan) {
+    try {
+      await updateLoan(loan);
+      setEditingLoan(undefined);
+      showSuccess('Loan updated');
+    } catch {
+      showError('Failed to update loan');
+    }
+  }
+
+  async function handleDeleteLoan() {
+    if (!deletingLoanId) return;
+    try {
+      await deletePaymentsByLoan(deletingLoanId);
+      await deleteLoan(deletingLoanId);
+      setDeletingLoanId(null);
+      showSuccess('Loan deleted');
+    } catch {
+      showError('Failed to delete loan');
+    }
+  }
+
+  const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
+
   async function handleMarkReceived(paymentId: string) {
     const payment = myPayments.find((p) => p.id === paymentId);
     if (!payment) return;
@@ -220,10 +253,6 @@ export function MediatorDashboardPage() {
       showError('Failed to update payment');
     }
   }
-
-  const hasBorrower = borrowerLoans.length > 0;
-  const hasMediator = mediatorLoans.length > 0;
-  const hasLender   = lenderLoans.length > 0;
 
   function handleDownloadPDF() {
     const name = viewAsName || userPhone;
@@ -355,7 +384,7 @@ export function MediatorDashboardPage() {
                 width={48}
               />
               <Tooltip
-                formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                formatter={(value: any, name: any) => [formatCurrency(Number(value) || 0), String(name)]}
                 contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid #e2e8f0' }}
               />
               <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
@@ -381,7 +410,9 @@ export function MediatorDashboardPage() {
         const loanSource = (l: typeof borrowerLoans[0]) =>
           l.loanType === 'Through Mediator' && l.mediatorName ? l.mediatorName : (l.lenderName || 'Admin');
 
-        const LoanRows = ({ list, muted }: { list: typeof borrowerLoans; muted?: boolean }) => (<>
+        const canEditBorrower = !isViewAs && hasFullAccess;
+
+        const LoanRows = ({ list, muted, showActions }: { list: typeof borrowerLoans; muted?: boolean; showActions?: boolean }) => (<>
           {/* Mobile cards */}
           <div className="md:hidden divide-y divide-slate-50">
             {list.map((l) => (
@@ -403,6 +434,16 @@ export function MediatorDashboardPage() {
                   <div className="bg-slate-50 rounded-xl px-3 py-2"><p className="text-slate-400">Monthly Due</p><p className="font-semibold text-slate-800 mt-0.5">{formatCurrency(l.monthlyInterestAmount)}</p></div>
                   <div className="bg-slate-50 rounded-xl px-3 py-2"><p className="text-slate-400">Age</p><p className="font-semibold text-slate-800 mt-0.5">{loanAge(l.dateGiven)}</p></div>
                 </div>
+                {canEditBorrower && showActions && (
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => setEditingLoan(l)} className="flex items-center gap-1 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition-colors">
+                      <Pencil size={12} /> Edit
+                    </button>
+                    <button onClick={() => setDeletingLoanId(l.loanId)} className="flex items-center gap-1 text-xs font-medium text-red-500 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors">
+                      <Trash2 size={12} /> Delete
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -423,6 +464,14 @@ export function MediatorDashboardPage() {
               <td className="px-5 py-3 text-xs text-slate-400">{formatDate(l.dateGiven)} · Due {ordinal(l.monthlyDueDay)}</td>
               <td className="px-5 py-3 text-xs text-slate-400">{loanAge(l.dateGiven)}</td>
               <td className="px-5 py-3"><StatusBadge status={l.loanStatus} /></td>
+              <td className="px-5 py-3">
+                {canEditBorrower && showActions && (
+                  <div className="flex gap-1">
+                    <button onClick={() => setEditingLoan(l)} className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"><Pencil size={14} /></button>
+                    <button onClick={() => setDeletingLoanId(l.loanId)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                  </div>
+                )}
+              </td>
             </tr>
           ))}
         </>);
@@ -438,17 +487,17 @@ export function MediatorDashboardPage() {
             ) : (
               <table className="hidden md:table min-w-full">
                 <thead><tr className="border-b border-slate-50">
-                  {['Loan','From','Principal','Rate','Monthly Due','Date Given','Age','Status'].map((h) => (
+                  {['Loan','From','Principal','Rate','Monthly Due','Date Given','Age','Status', ''].map((h) => (
                     <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr></thead>
-                <tbody><LoanRows list={activeLoans} /></tbody>
+                <tbody><LoanRows list={activeLoans} showActions /></tbody>
               </table>
             )}
             <div className="md:hidden">
               {activeLoans.length === 0
                 ? <div className="px-5 py-6 text-sm text-slate-400">No active loans</div>
-                : <LoanRows list={activeLoans} />}
+                : <LoanRows list={activeLoans} showActions />}
             </div>
 
             {closedLoans.length > 0 && (
@@ -461,9 +510,9 @@ export function MediatorDashboardPage() {
                 {showClosedLoans && (
                   <>
                     <table className="hidden md:table min-w-full bg-slate-50/30">
-                      <tbody><LoanRows list={closedLoans} muted /></tbody>
+                      <tbody><LoanRows list={closedLoans} muted showActions /></tbody>
                     </table>
-                    <div className="md:hidden"><LoanRows list={closedLoans} muted /></div>
+                    <div className="md:hidden"><LoanRows list={closedLoans} muted showActions /></div>
                   </>
                 )}
               </div>
@@ -825,6 +874,27 @@ export function MediatorDashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {editingLoan && (
+        <Modal title="Edit Loan" onClose={() => setEditingLoan(undefined)}>
+          <LoanForm
+            initialValues={editingLoan}
+            onSubmit={handleUpdateLoan}
+            onCancel={() => setEditingLoan(undefined)}
+          />
+        </Modal>
+      )}
+
+      {deletingLoanId && deletingLoan && (
+        <ConfirmDialog
+          title="Delete Loan?"
+          message={`This will permanently delete loan ${deletingLoanId} and all associated payment records.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={handleDeleteLoan}
+          onCancel={() => setDeletingLoanId(null)}
+        />
       )}
     </div>
   );

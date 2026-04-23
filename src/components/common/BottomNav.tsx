@@ -2,21 +2,24 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, CreditCard, BarChart3, Upload } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
-const adminNav = [
+const commonNav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
   { to: '/loans',     icon: CreditCard,      label: 'Loans' },
   { to: '/payments',  icon: BarChart3,        label: 'Payments' },
-  { to: '/import',    icon: Upload,           label: 'Import' },
+];
+
+const adminOnlyNav = [
+  { to: '/import', icon: Upload, label: 'Import' },
 ];
 
 export function BottomNav() {
   const { isAdmin } = useAuth();
-  if (!isAdmin) return null; // Mediators/borrowers have single-page view
+  const navItems = isAdmin ? [...commonNav, ...adminOnlyNav] : commonNav;
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-100 md:hidden">
-      <div className="grid grid-cols-4">
-        {adminNav.map(({ to, icon: Icon, label }) => (
+      <div className={isAdmin ? 'grid grid-cols-4' : 'grid grid-cols-3'}>
+        {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

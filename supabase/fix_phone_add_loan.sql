@@ -16,26 +16,34 @@ CREATE POLICY "phone_insert_own_loans" ON loans
     )
   );
 
--- ── 2. Ensure UPDATE policy exists for lenders ───────────────
+-- ── 2. Ensure UPDATE policy exists for lenders AND borrowers ─
+--    Borrowers can update loans they personally created (e.g. a
+--    mediator recording their own liability from an external source).
 DROP POLICY IF EXISTS "phone_update_own_loans" ON loans;
 CREATE POLICY "phone_update_own_loans" ON loans
   FOR UPDATE TO authenticated
   USING (
-    public.user_phone() IS NOT NULL AND
-    public.norm_phone(lender_phone) = public.user_phone()
+    public.user_phone() IS NOT NULL AND (
+      public.norm_phone(lender_phone)   = public.user_phone() OR
+      public.norm_phone(borrower_phone) = public.user_phone()
+    )
   )
   WITH CHECK (
-    public.user_phone() IS NOT NULL AND
-    public.norm_phone(lender_phone) = public.user_phone()
+    public.user_phone() IS NOT NULL AND (
+      public.norm_phone(lender_phone)   = public.user_phone() OR
+      public.norm_phone(borrower_phone) = public.user_phone()
+    )
   );
 
--- ── 3. DELETE policy for lenders ────────────────────────────
+-- ── 3. DELETE policy for lenders AND borrowers ───────────────
 DROP POLICY IF EXISTS "phone_delete_own_loans" ON loans;
 CREATE POLICY "phone_delete_own_loans" ON loans
   FOR DELETE TO authenticated
   USING (
-    public.user_phone() IS NOT NULL AND
-    public.norm_phone(lender_phone) = public.user_phone()
+    public.user_phone() IS NOT NULL AND (
+      public.norm_phone(lender_phone)   = public.user_phone() OR
+      public.norm_phone(borrower_phone) = public.user_phone()
+    )
   );
 
 -- ── 4. Payments — INSERT / UPDATE / DELETE for lenders ───────

@@ -64,7 +64,7 @@ export function LoansPage() {
   const ownedLoanIds = useMemo(() => {
     if (isAdmin) return undefined;           // admin acts on all
     if (!hasFullAccess) return new Set<string>(); // view-only
-    return new Set(loans.filter((l) => l.lenderPhone === userPhone).map((l) => l.loanId));
+    return new Set(loans.filter((l) => l.lenderPhone === userPhone || l.borrowerPhone === userPhone).map((l) => l.loanId));
   }, [isAdmin, hasFullAccess, loans, userPhone]);
 
   const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
