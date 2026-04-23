@@ -13,6 +13,7 @@ interface AuthContextValue {
   isAdmin: boolean;
   isMediator: boolean;
   isBorrower: boolean;
+  isDisabled: boolean;           // phone user whose account has been disabled by admin
   hasFullAccess: boolean;        // isAdmin OR phone user who has set a custom password
   userPhone: string;
   adminPhone: string;
@@ -156,9 +157,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin            = !!user && !isPhoneUser;
   const isMediator         = isPhoneUser;
   const isBorrower         = isPhoneUser;
+  const isDisabled         = isPhoneUser && profile?.isActive === false;
   const passwordChanged    = user?.user_metadata?.password_changed === true;
-  const needsFirstTimeSetup = isPhoneUser && !passwordChanged;
-  const hasFullAccess      = isAdmin || (isPhoneUser && passwordChanged);
+  const needsFirstTimeSetup = isPhoneUser && !passwordChanged && !isDisabled;
+  const hasFullAccess      = isAdmin || (isPhoneUser && passwordChanged && !isDisabled);
 
   const userPhone   = isPhoneUser ? (user?.email?.split('@')[0] ?? '') : '';
   const adminPhone  = isAdmin ? ((user?.user_metadata?.admin_phone as string | undefined) ?? '') : '';
@@ -169,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user, session, profile, loading,
       needsPasswordReset, needsFirstTimeSetup,
-      isAdmin, isMediator, isBorrower, hasFullAccess,
+      isAdmin, isMediator, isBorrower, isDisabled, hasFullAccess,
       userPhone, adminPhone, displayName,
       signIn, signInWithPhone, signOut,
       updatePassword, updatePasswordWithSecurity, updateProfile,

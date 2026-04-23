@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ShieldAlert, X } from 'lucide-react';
+import { ShieldAlert, X, Ban } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { BottomNav } from './BottomNav';
@@ -12,12 +12,13 @@ const pageTitles: Record<string, string> = {
   '/loans':     'Loans',
   '/payments':  'Payments',
   '/mediators': 'Mediators',
+  '/users':     'Users',
   '/import':    'Import / Export',
 };
 
 export function AppShell() {
   const { loading, autoImporting } = useApp();
-  const { needsFirstTimeSetup } = useAuth();
+  const { needsFirstTimeSetup, isDisabled, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const title = pageTitles[location.pathname] ?? 'Loan Book';
@@ -33,6 +34,28 @@ export function AppShell() {
           <p className="text-sm font-medium text-slate-600">
             {autoImporting ? 'Importing loan data…' : 'Loading…'}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isDisabled) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="text-center max-w-sm">
+          <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Ban size={28} className="text-red-500" />
+          </div>
+          <h1 className="text-lg font-bold text-slate-800 mb-2">Account Disabled</h1>
+          <p className="text-sm text-slate-500 mb-6">
+            Your account has been disabled by the administrator. Please contact them to regain access.
+          </p>
+          <button
+            onClick={signOut}
+            className="px-5 py-2.5 text-sm font-semibold text-white bg-slate-700 hover:bg-slate-800 rounded-xl transition-colors"
+          >
+            Sign Out
+          </button>
         </div>
       </div>
     );

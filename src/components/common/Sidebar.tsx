@@ -1,5 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
-import { LayoutDashboard, CreditCard, BarChart3, Upload, HandCoins, User } from 'lucide-react';
+import { LayoutDashboard, CreditCard, BarChart3, Upload, HandCoins, User, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 const commonNav = [
@@ -9,6 +9,7 @@ const commonNav = [
 ];
 
 const adminOnlyNav = [
+  { to: '/users',  icon: Users,  label: 'Users' },
   { to: '/import', icon: Upload, label: 'Import / Export' },
 ];
 

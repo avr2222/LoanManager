@@ -5,6 +5,20 @@ export interface Profile {
   id: string;
   role: 'admin' | 'mediator' | 'borrower';
   phone: string;
+  isActive: boolean;
+  disabledAt?: string | null;
+  disabledBy?: string | null;
+}
+
+function fromDbProfile(row: Record<string, unknown>): Profile {
+  return {
+    id:         row.id as string,
+    role:       (row.role as Profile['role']) ?? 'mediator',
+    phone:      (row.phone as string) ?? '',
+    isActive:   row.is_active !== false, // default true if NULL
+    disabledAt: (row.disabled_at as string | null) ?? null,
+    disabledBy: (row.disabled_by as string | null) ?? null,
+  };
 }
 
 export const profilesService = {
@@ -15,7 +29,33 @@ export const profilesService = {
       .eq('id', userId)
       .single();
     if (error) return null;
-    return data as Profile;
+    return fromDbProfile(data as Record<string, unknown>);
+  },
+
+  // Admin: list all phone-user profiles
+  async listAll(): Promise<Profile[]> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .neq('role', 'admin')
+      .order('phone', { ascending: true });
+    if (error) return [];
+    return (data as Record<string, unknown>[]).map(fromDbProfile);
+  },
+
+  // Admin: enable or disable a user
+  async setActive(userId: string, active: boolean, disabledBy?: string): Promise<{ error: string | null }> {
+    const updates: Record<string, unknown> = {
+      is_active: active,
+      disabled_at: active ? null : new Date().toISOString(),
+      disabled_by: active ? null : (disabledBy ?? null),
+    };
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId);
+    if (error) return { error: error.message };
+    return { error: null };
   },
 
   // Auto-provision phone accounts from loan data.
@@ -57,6 +97,6 @@ export const profilesService = {
       .select('*')
       .eq('role', role);
     if (error) return [];
-    return data as Profile[];
+    return (data as Record<string, unknown>[]).map(fromDbProfile);
   },
 };

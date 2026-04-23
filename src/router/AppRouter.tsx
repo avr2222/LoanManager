@@ -5,6 +5,7 @@ import { AddLoanPage } from '@/pages/AddLoanPage';
 import { LoansPage } from '@/pages/LoansPage';
 import { PaymentsPage } from '@/pages/PaymentsPage';
 import { ImportPage } from '@/pages/ImportPage';
+import { UsersPage } from '@/pages/UsersPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
 import { SetPasswordPage } from '@/pages/SetPasswordPage';
@@ -57,6 +58,7 @@ export function AppRouter() {
           <Route path="add-loan"     element={<FullAccessOnly><AddLoanPage /></FullAccessOnly>} />
           <Route path="loans"        element={<LoansPage />} />
           <Route path="payments"     element={<PaymentsPage />} />
+          <Route path="users"        element={<AdminOnly><UsersPage /></AdminOnly>} />
           <Route path="import"       element={<AdminOnly><ImportPage /></AdminOnly>} />
         </Route>
       </Routes>
