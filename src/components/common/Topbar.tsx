@@ -3,6 +3,7 @@ import { Download, Upload, LogOut, User, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { loansService } from '@/services/supabaseService';
+import { profilesService } from '@/services/profilesService';
 import { useToast } from './Toast';
 import { useRef } from 'react';
 
@@ -42,13 +43,16 @@ export function Topbar({ title }: TopbarProps) {
     if (!nameInput.trim()) return;
     setSaving(true);
     const { error } = await updateProfile(nameInput.trim(), isAdmin ? phoneInput : undefined);
-    setSaving(false);
-    if (error) { showError(error); return; }
-    // Update any loans that still show blank/old lender name or phone
+    if (error) { setSaving(false); showError(error); return; }
     if (isAdmin) {
+      // Update any loans that still show blank/old lender name or phone
       loansService.fillBlankLenderName(nameInput.trim()).catch(console.warn);
       loansService.fillBlankLenderPhone(phoneInput.trim()).catch(console.warn);
+    } else if (user) {
+      // Phone user: save display name to profiles table so admin can see it in Users page
+      profilesService.updateDisplayName(user.id, nameInput.trim()).catch(console.warn);
     }
+    setSaving(false);
     showSuccess('Profile updated');
     setShowProfile(false);
   }
@@ -138,6 +142,9 @@ export function Topbar({ title }: TopbarProps) {
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
                     autoFocus
                   />
+                  {!isAdmin && (
+                    <p className="text-xs text-slate-400 mt-1">Shown to admin in the Users list</p>
+                  )}
                 </div>
 
                 {isAdmin && (

@@ -3,9 +3,10 @@
 -- Run this in Supabase SQL Editor (safe to re-run)
 -- ============================================================
 
--- ── 1. Add is_active + audit columns to profiles ─────────────
+-- ── 1. Add is_active + display_name + audit columns to profiles ─
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS is_active    BOOLEAN     NOT NULL DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS display_name TEXT        DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS disabled_at  TIMESTAMPTZ DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS disabled_by  TEXT        DEFAULT NULL;
 
@@ -36,21 +37,33 @@ BEGIN
 END;
 $$;
 
--- ── 3. Admin can read ALL profiles ───────────────────────────
-DROP POLICY IF EXISTS "admin_read_all_profiles" ON public.profiles;
-CREATE POLICY "admin_read_all_profiles" ON public.profiles
+-- ── 3. Replace old per-user policies with admin-aware ones ──
+--    Drop old policies from add_profiles.sql first
+DROP POLICY IF EXISTS "Users read own profile"   ON public.profiles;
+DROP POLICY IF EXISTS "Users update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "admin_read_all_profiles"  ON public.profiles;
+DROP POLICY IF EXISTS "admin_update_profiles"    ON public.profiles;
+
+-- Admin sees all profiles; phone users see only their own
+CREATE POLICY "profiles_select" ON public.profiles
   FOR SELECT TO authenticated
   USING (
     public.user_phone() IS NULL   -- admin has no phone → sees all
-    OR id = auth.uid()            -- phone users see own profile
+    OR id = auth.uid()            -- phone users see own profile only
   );
 
--- ── 4. Admin can update any profile (enable / disable) ───────
-DROP POLICY IF EXISTS "admin_update_profiles" ON public.profiles;
-CREATE POLICY "admin_update_profiles" ON public.profiles
+-- Admin can update any profile (enable/disable)
+-- Phone users can update only their own (to set display_name etc.)
+CREATE POLICY "profiles_update" ON public.profiles
   FOR UPDATE TO authenticated
-  USING (public.user_phone() IS NULL)          -- only admin can update others
-  WITH CHECK (public.user_phone() IS NULL);
+  USING (
+    public.user_phone() IS NULL   -- admin: any row
+    OR id = auth.uid()            -- phone user: own row only
+  )
+  WITH CHECK (
+    public.user_phone() IS NULL
+    OR id = auth.uid()
+  );
 
 -- ── 5. Block disabled phone users from reading loan data ─────
 --    Add is_active check to existing loan SELECT policies.
@@ -91,7 +104,19 @@ CREATE POLICY "block_disabled_users_payments" ON public.payments
   FOR SELECT TO authenticated
   USING (public.is_active_user() = TRUE);
 
--- ── 6. Back-fill existing @user.local profiles if missing ────
+-- ── 6. Fix existing @user.local profiles that got role='admin' ──
+--    The old trigger only handled @mediator.local; @user.local fell
+--    through to 'admin'. Correct those rows now.
+UPDATE public.profiles
+SET
+  role  = 'mediator',
+  phone = REPLACE(auth.users.email, '@user.local', '')
+FROM auth.users
+WHERE public.profiles.id   = auth.users.id
+  AND auth.users.email      LIKE '%@user.local'
+  AND public.profiles.role  = 'admin';
+
+-- ── 7. Back-fill @user.local profiles that don't exist yet ───
 INSERT INTO public.profiles (id, role, phone)
 SELECT
   id,

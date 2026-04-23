@@ -5,6 +5,7 @@ export interface Profile {
   id: string;
   role: 'admin' | 'mediator' | 'borrower';
   phone: string;
+  displayName?: string | null;
   isActive: boolean;
   disabledAt?: string | null;
   disabledBy?: string | null;
@@ -12,12 +13,13 @@ export interface Profile {
 
 function fromDbProfile(row: Record<string, unknown>): Profile {
   return {
-    id:         row.id as string,
-    role:       (row.role as Profile['role']) ?? 'mediator',
-    phone:      (row.phone as string) ?? '',
-    isActive:   row.is_active !== false, // default true if NULL
-    disabledAt: (row.disabled_at as string | null) ?? null,
-    disabledBy: (row.disabled_by as string | null) ?? null,
+    id:          row.id as string,
+    role:        (row.role as Profile['role']) ?? 'mediator',
+    phone:       (row.phone as string) ?? '',
+    displayName: (row.display_name as string | null) ?? null,
+    isActive:    row.is_active !== false, // default true if NULL
+    disabledAt:  (row.disabled_at as string | null) ?? null,
+    disabledBy:  (row.disabled_by as string | null) ?? null,
   };
 }
 
@@ -41,6 +43,14 @@ export const profilesService = {
       .order('phone', { ascending: true });
     if (error) return [];
     return (data as Record<string, unknown>[]).map(fromDbProfile);
+  },
+
+  // Phone user: save their chosen display name to profiles table
+  async updateDisplayName(userId: string, name: string): Promise<void> {
+    await supabase
+      .from('profiles')
+      .update({ display_name: name.trim() || null })
+      .eq('id', userId);
   },
 
   // Admin: enable or disable a user
