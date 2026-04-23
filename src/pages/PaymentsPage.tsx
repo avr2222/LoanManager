@@ -18,14 +18,20 @@ export function PaymentsPage() {
   const { loans } = useLoans();
   const { hasFullAccess, isAdmin, userPhone } = useAuth();
 
-  // For phone users: only allow actions on payments for loans they own as lender
+  // For phone users: allow actions on payments for loans they own as lender or mediator
+  // (mediator manages payments when the lender doesn't use the app)
   const ownedLoanIds = useMemo<Set<string> | undefined>(() => {
     if (isAdmin) return undefined; // admin owns all
     if (!userPhone) return new Set();
     const norm = (p: string) => p.replace(/\D/g, '').slice(-10);
     const myPhone = norm(userPhone);
     return new Set(
-      loans.filter((l) => l.lenderPhone && norm(l.lenderPhone) === myPhone).map((l) => l.loanId)
+      loans
+        .filter((l) =>
+          (l.lenderPhone  && norm(l.lenderPhone)  === myPhone) ||
+          (l.mediatorPhone && norm(l.mediatorPhone) === myPhone)
+        )
+        .map((l) => l.loanId)
     );
   }, [isAdmin, userPhone, loans]);
   const { showSuccess, showError } = useToast();

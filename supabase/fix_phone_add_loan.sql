@@ -46,10 +46,10 @@ CREATE POLICY "phone_delete_own_loans" ON loans
     )
   );
 
--- ── 4. Payments — INSERT / UPDATE / DELETE for lenders ───────
---    Phone users can act on payments for loans they own as lender.
---    Subquery on loans is safe: phone user's SELECT policy on loans
---    already exposes their lender rows.
+-- ── 4. Payments — INSERT / UPDATE / DELETE for lenders & mediators ──
+--    Phone users can act on payments for loans they own as lender OR mediator.
+--    Mediator access covers the case where the lender doesn't use the app
+--    and the mediator manages everything on their behalf.
 
 DROP POLICY IF EXISTS "phone_insert_own_payments" ON payments;
 CREATE POLICY "phone_insert_own_payments" ON payments
@@ -58,7 +58,8 @@ CREATE POLICY "phone_insert_own_payments" ON payments
     public.user_phone() IS NOT NULL AND
     loan_id IN (
       SELECT loan_id FROM loans
-      WHERE public.norm_phone(lender_phone) = public.user_phone()
+      WHERE public.norm_phone(lender_phone)   = public.user_phone()
+         OR public.norm_phone(mediator_phone)  = public.user_phone()
     )
   );
 
@@ -69,14 +70,16 @@ CREATE POLICY "phone_update_own_payments" ON payments
     public.user_phone() IS NOT NULL AND
     loan_id IN (
       SELECT loan_id FROM loans
-      WHERE public.norm_phone(lender_phone) = public.user_phone()
+      WHERE public.norm_phone(lender_phone)   = public.user_phone()
+         OR public.norm_phone(mediator_phone)  = public.user_phone()
     )
   )
   WITH CHECK (
     public.user_phone() IS NOT NULL AND
     loan_id IN (
       SELECT loan_id FROM loans
-      WHERE public.norm_phone(lender_phone) = public.user_phone()
+      WHERE public.norm_phone(lender_phone)   = public.user_phone()
+         OR public.norm_phone(mediator_phone)  = public.user_phone()
     )
   );
 
@@ -87,7 +90,8 @@ CREATE POLICY "phone_delete_own_payments" ON payments
     public.user_phone() IS NOT NULL AND
     loan_id IN (
       SELECT loan_id FROM loans
-      WHERE public.norm_phone(lender_phone) = public.user_phone()
+      WHERE public.norm_phone(lender_phone)   = public.user_phone()
+         OR public.norm_phone(mediator_phone)  = public.user_phone()
     )
   );
 

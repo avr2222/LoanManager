@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { Payment, PaymentStatus } from '@/types';
 import { useLoans } from '@/context/LoanContext';
+import { useAuth } from '@/context/AuthContext';
 import { formatCurrency, formatMonthYear } from '@/utils/formatUtils';
 import { getDueDateForMonth, toISODateString } from '@/utils/dateUtils';
 
@@ -14,7 +15,20 @@ interface PaymentFormProps {
 
 export function PaymentForm({ initialValues, defaultLoanId, onSubmit, onCancel }: PaymentFormProps) {
   const { loans } = useLoans();
-  const activeLoans = loans.filter((l) => l.loanStatus === 'Active');
+  const { isAdmin, userPhone } = useAuth();
+
+  // Phone users can record payments for loans where they are the lender or mediator
+  const activeLoans = (() => {
+    const active = loans.filter((l) => l.loanStatus === 'Active');
+    if (isAdmin) return active;
+    const norm = (p: string) => p.replace(/\D/g, '').slice(-10);
+    const myPhone = norm(userPhone ?? '');
+    return active.filter(
+      (l) =>
+        (l.lenderPhone  && norm(l.lenderPhone)  === myPhone) ||
+        (l.mediatorPhone && norm(l.mediatorPhone) === myPhone)
+    );
+  })();
 
   const now = new Date();
   const defaultMonthYear = formatMonthYear(now);

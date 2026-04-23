@@ -184,6 +184,8 @@ export function MediatorDashboardPage() {
       let expected = 0;
       let received = 0;
       let commission = 0;
+      let due = 0;
+      let paid = 0;
 
       for (const p of myPayments) {
         // Normalise monthYear to "YYYY-MM" regardless of stored format
@@ -203,14 +205,18 @@ export function MediatorDashboardPage() {
         if (mediatorLoans.some((l) => l.loanId === p.loanId)) {
           commission += p.mediatorShare;
         }
+        if (borrowerLoanIds.has(p.loanId)) {
+          due  += p.netAmountExpected;
+          paid += p.amountReceived;
+        }
       }
 
-      return { month: label, Expected: expected, Received: received, Commission: commission };
+      return { month: label, Expected: expected, Received: received, Commission: commission, Due: due, Paid: paid };
     });
-  }, [myPayments, lenderLoanIds, mediatorLoans]);
+  }, [myPayments, lenderLoanIds, mediatorLoans, borrowerLoanIds]);
 
-  const showChart = (hasLender || hasMediator) &&
-    monthlyChartData.some((d) => d.Expected > 0 || d.Commission > 0);
+  const showChart = (hasLender || hasMediator || hasBorrower) &&
+    monthlyChartData.some((d) => d.Expected > 0 || d.Commission > 0 || d.Due > 0);
 
   async function handleUpdateLoan(loan: Loan) {
     try {
@@ -311,9 +317,9 @@ export function MediatorDashboardPage() {
         {(hasBorrower || hasMediator || hasLender) && (
           <button
             onClick={handleDownloadPDF}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-rose-500 rounded-lg hover:bg-rose-600 active:scale-95 transition-all shadow-sm"
           >
-            <FileText size={15} className="text-red-500" /> Download PDF
+            <FileText size={15} /> Statement
           </button>
         )}
       </div>
@@ -367,7 +373,7 @@ export function MediatorDashboardPage() {
         </div>
       )}
 
-      {/* ── Monthly Expected vs Received chart ── */}
+      {/* ── Monthly chart ── */}
       {showChart && (
         <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">
@@ -397,6 +403,12 @@ export function MediatorDashboardPage() {
               )}
               {hasMediator && (
                 <Bar dataKey="Commission" name="Commission" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              )}
+              {hasBorrower && !hasLender && (
+                <Bar dataKey="Due" name="Interest Due" fill="#e879f9" radius={[4, 4, 0, 0]} />
+              )}
+              {hasBorrower && !hasLender && (
+                <Bar dataKey="Paid" name="Interest Paid" fill="#10b981" radius={[4, 4, 0, 0]} />
               )}
             </BarChart>
           </ResponsiveContainer>
