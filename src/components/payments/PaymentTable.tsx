@@ -14,11 +14,13 @@ interface PaymentTableProps {
   readOnly?: boolean;
   /** When provided, action buttons are only shown for payments whose loanId is in this set */
   ownedLoanIds?: Set<string>;
+  /** When false, the Record Payment button is disabled (phone user has no lender loans) */
+  canAdd?: boolean;
 }
 
 type SortKey = 'monthYear' | 'loanId' | 'borrowerName' | 'netAmountExpected' | 'amountReceived' | 'daysOverdue' | 'paymentStatus';
 
-export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, readOnly, ownedLoanIds }: PaymentTableProps) {
+export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, readOnly, ownedLoanIds, canAdd = true }: PaymentTableProps) {
   // A row is editable if readOnly is false AND (no ownedLoanIds filter, or the payment's loan is owned by the current user)
   const canAct = (p: Payment) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(p.loanId));
   const [search, setSearch] = useState('');
@@ -106,8 +108,14 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
         </select>
         {!readOnly && (
           <button
-            onClick={onAdd}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 shrink-0"
+            onClick={canAdd ? onAdd : undefined}
+            disabled={!canAdd}
+            title={!canAdd ? 'You have no loans as lender to record payments for' : undefined}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white rounded-lg shrink-0 transition-colors ${
+              canAdd
+                ? 'bg-indigo-500 hover:bg-indigo-600 cursor-pointer'
+                : 'bg-indigo-300 cursor-not-allowed opacity-60'
+            }`}
           >
             <Plus size={15} />
             <span className="hidden sm:inline">Record Payment</span>

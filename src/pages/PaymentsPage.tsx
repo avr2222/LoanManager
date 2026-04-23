@@ -127,10 +127,11 @@ export function PaymentsPage() {
         onMarkPaid={handleMarkPaid}
         readOnly={!hasFullAccess}
         ownedLoanIds={ownedLoanIds}
+        canAdd={isAdmin || (ownedLoanIds !== undefined && ownedLoanIds.size > 0)}
       />
 
       {/* Floating action button — mobile only */}
-      {hasFullAccess && (
+      {hasFullAccess && (isAdmin || (ownedLoanIds !== undefined && ownedLoanIds.size > 0)) && (
         <button
           onClick={() => { setDefaultLoanId(undefined); setShowForm(true); }}
           className="fixed bottom-20 right-4 z-30 md:hidden w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-transform"
