@@ -31,6 +31,8 @@ export interface Loan {
   remarks: string;
   createdAt: string;                // ISO timestamp
   updatedAt: string;
+  deletedAt?: string | null;        // soft-delete timestamp (null = active)
+  deletedBy?: string | null;        // phone or email of who deleted it
 }
 
 // ── Monthly Payment ───────────────────────────────────────────────────────────
@@ -52,6 +54,21 @@ export interface Payment {
   remarks: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;        // soft-delete timestamp (null = active)
+  deletedBy?: string | null;        // phone or email of who deleted it
+}
+
+// ── Audit Log ─────────────────────────────────────────────────────────────────
+
+export interface AuditLog {
+  id: string;
+  tableName: string;                // 'loans' | 'payments'
+  recordId: string;
+  action: 'created' | 'updated' | 'deleted' | 'restored';
+  performedBy: string | null;       // phone or email
+  performedAt: string;              // ISO timestamp
+  oldData?: Record<string, unknown> | null;
+  newData?: Record<string, unknown> | null;
 }
 
 // ── App Meta ──────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Edit2, Trash2, XCircle, Plus, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Loan, LoanStatus } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -34,8 +34,10 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnl
   const [statusFilter, setStatusFilter] = useState<LoanStatus | 'All'>('Active');
   const [sortKey, setSortKey] = useState<SortKey>('loanId');
   const [sortAsc, setSortAsc] = useState(true);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(1);           // desktop pagination
+  const [mobilePage, setMobilePage] = useState(1); // mobile infinite scroll
   const PAGE_SIZE = 25;
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const filtered = loans
     .filter((l) => {
@@ -55,12 +57,27 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnl
     });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE); // desktop
+  const mobileItems = filtered.slice(0, mobilePage * PAGE_SIZE);           // mobile cumulative
+  const hasMoreMobile = mobileItems.length < filtered.length;
+
+  // Infinite scroll: load more when sentinel enters viewport
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMoreMobile) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) setMobilePage((p) => p + 1); },
+      { rootMargin: '120px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMoreMobile]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortAsc(!sortAsc);
     else { setSortKey(key); setSortAsc(true); }
     setPage(1);
+    setMobilePage(1);
   }
 
   function SortIcon({ col }: { col: SortKey }) {
@@ -70,8 +87,9 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnl
 
   const thClass = 'px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-600 select-none';
 
+  // Desktop only — mobile uses infinite scroll instead
   const pagination = totalPages > 1 && (
-    <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
+    <div className="hidden md:flex items-center justify-between mt-4 text-sm text-slate-500">
       <span>{filtered.length} loans</span>
       <div className="flex gap-2">
         <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50">Prev</button>
@@ -91,13 +109,13 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnl
             type="text"
             placeholder="Search loans..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); setMobilePage(1); }}
             className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value as LoanStatus | 'All'); setPage(1); }}
+          onChange={(e) => { setStatusFilter(e.target.value as LoanStatus | 'All'); setPage(1); setMobilePage(1); }}
           className="px-2 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none"
         >
           <option value="All">All</option>
@@ -127,9 +145,9 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnl
         />
       ) : (
         <>
-          {/* Mobile card view */}
+          {/* Mobile card view — infinite scroll */}
           <div className="md:hidden space-y-3">
-            {paged.map((loan) => (
+            {mobileItems.map((loan) => (
               <div key={loan.loanId} className="bg-white rounded-2xl border border-slate-100 p-4">
                 <div className="flex items-start justify-between">
                   <div>
@@ -168,6 +186,15 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnl
                 </div>
               </div>
             ))}
+            {/* Infinite scroll sentinel */}
+            {hasMoreMobile && (
+              <div ref={sentinelRef} className="py-4 flex justify-center">
+                <span className="text-xs text-slate-400">Loading more…</span>
+              </div>
+            )}
+            {!hasMoreMobile && filtered.length > PAGE_SIZE && (
+              <p className="text-center text-xs text-slate-400 py-3">All {filtered.length} loans shown</p>
+            )}
           </div>
 
           {/* Desktop table view */}

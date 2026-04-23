@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Loan, Payment } from '@/types';
+import type { Loan, Payment, AuditLog } from '@/types';
 
 // ── Column mapping helpers ────────────────────────────────────────────────────
 
@@ -62,6 +62,8 @@ function fromDbLoan(r: Record<string, unknown>): Loan {
     remarks: r.remarks as string,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
+    deletedAt: (r.deleted_at as string) ?? null,
+    deletedBy: (r.deleted_by as string) ?? null,
   };
 }
 
@@ -104,17 +106,45 @@ function fromDbPayment(r: Record<string, unknown>): Payment {
     remarks: r.remarks as string,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
+    deletedAt: (r.deleted_at as string) ?? null,
+    deletedBy: (r.deleted_by as string) ?? null,
+  };
+}
+
+function fromDbAuditLog(r: Record<string, unknown>): AuditLog {
+  return {
+    id: r.id as string,
+    tableName: r.table_name as string,
+    recordId: r.record_id as string,
+    action: r.action as AuditLog['action'],
+    performedBy: (r.performed_by as string) ?? null,
+    performedAt: r.performed_at as string,
+    oldData: (r.old_data as Record<string, unknown>) ?? null,
+    newData: (r.new_data as Record<string, unknown>) ?? null,
   };
 }
 
 // ── Loans ──────────────────────────────────────────────────────────────────────
 
 export const loansService = {
+  /** Fetch all active (non-deleted) loans */
   async fetchAll(): Promise<Loan[]> {
     const { data, error } = await supabase
       .from('loans')
       .select('*')
+      .is('deleted_at', null)
       .order('loan_id', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((r) => fromDbLoan(r as Record<string, unknown>));
+  },
+
+  /** Fetch soft-deleted loans (admin trash view) */
+  async fetchDeleted(): Promise<Loan[]> {
+    const { data, error } = await supabase
+      .from('loans')
+      .select('*')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false });
     if (error) throw error;
     return (data ?? []).map((r) => fromDbLoan(r as Record<string, unknown>));
   },
@@ -130,13 +160,40 @@ export const loansService = {
     if (error) throw error;
   },
 
+  /** Soft-delete — sets deleted_at; trigger sets deleted_by automatically */
   async delete(loanId: string): Promise<void> {
-    const { error } = await supabase.from('loans').delete().eq('loan_id', loanId);
+    const { error } = await supabase
+      .from('loans')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('loan_id', loanId);
     if (error) throw error;
   },
 
+  /** Soft-delete all loans (used by Clear All Data) */
   async deleteAll(): Promise<void> {
-    const { error } = await supabase.from('loans').delete().neq('loan_id', '');
+    const { error } = await supabase
+      .from('loans')
+      .update({ deleted_at: new Date().toISOString() })
+      .is('deleted_at', null);
+    if (error) throw error;
+  },
+
+  /** Restore a soft-deleted loan */
+  async restore(loanId: string): Promise<void> {
+    const { error } = await supabase
+      .from('loans')
+      .update({ deleted_at: null, deleted_by: null })
+      .eq('loan_id', loanId);
+    if (error) throw error;
+  },
+
+  /** Permanently hard-delete records already soft-deleted (admin purge) */
+  async hardDeletePurge(loanId: string): Promise<void> {
+    const { error } = await supabase
+      .from('loans')
+      .delete()
+      .eq('loan_id', loanId)
+      .not('deleted_at', 'is', null);
     if (error) throw error;
   },
 
@@ -145,13 +202,11 @@ export const loansService = {
   async getNextLoanId(): Promise<string> {
     const { data, error } = await supabase.rpc('get_next_loan_id');
     if (error || !data) {
-      // Fallback: timestamp-based ID avoids collisions if RPC not yet deployed
       return `L${Date.now()}`;
     }
     return data as string;
   },
 
-  // Fill in admin's real name on all loans that have no lender name set
   async fillBlankLenderName(name: string): Promise<void> {
     if (!name) return;
     await supabase
@@ -160,7 +215,6 @@ export const loansService = {
       .or('lender_name.is.null,lender_name.eq.');
   },
 
-  // Fill in admin's phone on all loans that have no lender phone set
   async fillBlankLenderPhone(phone: string): Promise<void> {
     if (!phone) return;
     const normalized = phone.replace(/\D/g, '').slice(-10);
@@ -175,11 +229,24 @@ export const loansService = {
 // ── Payments ───────────────────────────────────────────────────────────────────
 
 export const paymentsService = {
+  /** Fetch all active (non-deleted) payments */
   async fetchAll(): Promise<Payment[]> {
     const { data, error } = await supabase
       .from('payments')
       .select('*')
+      .is('deleted_at', null)
       .order('due_date', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((r) => fromDbPayment(r as Record<string, unknown>));
+  },
+
+  /** Fetch soft-deleted payments (admin trash view) */
+  async fetchDeleted(): Promise<Payment[]> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false });
     if (error) throw error;
     return (data ?? []).map((r) => fromDbPayment(r as Record<string, unknown>));
   },
@@ -195,35 +262,71 @@ export const paymentsService = {
     if (error) throw error;
   },
 
+  /** Soft-delete a single payment */
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('payments').delete().eq('id', id);
+    const { error } = await supabase
+      .from('payments')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id);
     if (error) throw error;
   },
 
+  /** Soft-delete all payments */
   async deleteAll(): Promise<void> {
-    const { error } = await supabase.from('payments').delete().neq('id', '');
+    const { error } = await supabase
+      .from('payments')
+      .update({ deleted_at: new Date().toISOString() })
+      .is('deleted_at', null);
     if (error) throw error;
   },
 
+  /** Soft-delete all payments for a given loan */
   async deleteByLoan(loanId: string): Promise<void> {
-    const { error } = await supabase.from('payments').delete().eq('loan_id', loanId);
+    const { error } = await supabase
+      .from('payments')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('loan_id', loanId)
+      .is('deleted_at', null);
     if (error) throw error;
   },
 
-  // Delete ALL payment records whose due_date is older than 6 months.
-  async deleteOlderThan6Months(): Promise<number> {
-    const cutoff = new Date();
-    cutoff.setMonth(cutoff.getMonth() - 6);
-    const cutoffStr = cutoff.toISOString().split('T')[0];
+  /** Restore a soft-deleted payment */
+  async restore(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('payments')
+      .update({ deleted_at: null, deleted_by: null })
+      .eq('id', id);
+    if (error) throw error;
+  },
 
-    const { data, error } = await supabase
+  /** Permanently hard-delete a record already soft-deleted (admin purge) */
+  async hardDeletePurge(id: string): Promise<void> {
+    const { error } = await supabase
       .from('payments')
       .delete()
-      .lt('due_date', cutoffStr)
-      .select('id');
+      .eq('id', id)
+      .not('deleted_at', 'is', null);
+    if (error) throw error;
+  },
+};
 
-    if (error) { console.warn('[Cleanup] Failed:', error.message); return 0; }
-    return data?.length ?? 0;
+// ── Audit Log ──────────────────────────────────────────────────────────────────
+
+export const auditLogService = {
+  /** Fetch audit log entries, optionally filtered by table or record */
+  async fetch(opts?: { tableName?: string; recordId?: string; limit?: number }): Promise<AuditLog[]> {
+    let query = supabase
+      .from('audit_log')
+      .select('*')
+      .order('performed_at', { ascending: false })
+      .limit(opts?.limit ?? 200);
+
+    if (opts?.tableName) query = query.eq('table_name', opts.tableName);
+    if (opts?.recordId)  query = query.eq('record_id', opts.recordId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map((r) => fromDbAuditLog(r as Record<string, unknown>));
   },
 };
 

@@ -41,6 +41,7 @@ interface LoanContextValue {
   addLoan: (loan: Loan) => Promise<Loan>;
   updateLoan: (loan: Loan) => Promise<void>;
   deleteLoan: (loanId: string) => Promise<void>;
+  restoreLoan: (loanId: string) => Promise<void>;
   setLoanStatus: (loanId: string, status: Loan['loanStatus']) => Promise<void>;
   bulkLoadLoans: (loans: Loan[]) => void;
 }
@@ -72,6 +73,12 @@ export function LoanProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'DELETE', payload: loanId });
   }, []);
 
+  const restoreLoan = useCallback(async (loanId: string) => {
+    await loansService.restore(loanId);
+    // Restored loan goes back to active list on next fetch — remove from local state
+    dispatch({ type: 'DELETE', payload: loanId });
+  }, []);
+
   const setLoanStatus = useCallback(async (loanId: string, status: Loan['loanStatus']) => {
     const loan = loans.find((l) => l.loanId === loanId);
     if (!loan) return;
@@ -85,7 +92,7 @@ export function LoanProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <LoanContext.Provider value={{ loans, addLoan, updateLoan, deleteLoan, setLoanStatus, bulkLoadLoans }}>
+    <LoanContext.Provider value={{ loans, addLoan, updateLoan, deleteLoan, restoreLoan, setLoanStatus, bulkLoadLoans }}>
       {children}
     </LoanContext.Provider>
   );

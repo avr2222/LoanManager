@@ -38,6 +38,7 @@ interface PaymentContextValue {
   addPayment: (payment: Payment) => Promise<void>;
   updatePayment: (payment: Payment) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
+  restorePayment: (id: string) => Promise<void>;
   deletePaymentsByLoan: (loanId: string) => Promise<void>;
   bulkLoadPayments: (payments: Payment[]) => void;
 }
@@ -64,6 +65,11 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'DELETE', payload: id });
   }, []);
 
+  const restorePayment = useCallback(async (id: string) => {
+    await paymentsService.restore(id);
+    dispatch({ type: 'DELETE', payload: id });
+  }, []);
+
   const deletePaymentsByLoan = useCallback(async (loanId: string) => {
     await paymentsService.deleteByLoan(loanId);
     dispatch({ type: 'DELETE_BY_LOAN', payload: loanId });
@@ -74,7 +80,7 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <PaymentContext.Provider value={{ payments, addPayment, updatePayment, deletePayment, deletePaymentsByLoan, bulkLoadPayments }}>
+    <PaymentContext.Provider value={{ payments, addPayment, updatePayment, deletePayment, restorePayment, deletePaymentsByLoan, bulkLoadPayments }}>
       {children}
     </PaymentContext.Provider>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Edit2, Trash2, Plus, Search, ChevronUp, ChevronDown, CheckCircle2 } from 'lucide-react';
 import type { Payment, PaymentStatus } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -27,8 +27,10 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'All'>('All');
   const [sortKey, setSortKey] = useState<SortKey>('daysOverdue');
   const [sortAsc, setSortAsc] = useState(false);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(1);           // desktop pagination
+  const [mobilePage, setMobilePage] = useState(1); // mobile infinite scroll
   const PAGE_SIZE = 25;
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const filtered = payments
     .filter((p) => {
@@ -48,12 +50,27 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
     });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE); // desktop
+  const mobileItems = filtered.slice(0, mobilePage * PAGE_SIZE);           // mobile cumulative
+  const hasMoreMobile = mobileItems.length < filtered.length;
+
+  // Infinite scroll: load more when sentinel enters viewport
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMoreMobile) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) setMobilePage((p) => p + 1); },
+      { rootMargin: '120px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMoreMobile]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortAsc(!sortAsc);
     else { setSortKey(key); setSortAsc(true); }
     setPage(1);
+    setMobilePage(1);
   }
 
   function SortIcon({ col }: { col: SortKey }) {
@@ -70,8 +87,9 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
     </th>
   );
 
+  // Desktop only — mobile uses infinite scroll instead
   const pagination = totalPages > 1 && (
-    <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
+    <div className="hidden md:flex items-center justify-between mt-4 text-sm text-slate-500">
       <span>{filtered.length} records</span>
       <div className="flex gap-2">
         <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50">Prev</button>
@@ -91,13 +109,13 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
             type="text"
             placeholder="Search..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); setMobilePage(1); }}
             className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value as PaymentStatus | 'All'); setPage(1); }}
+          onChange={(e) => { setStatusFilter(e.target.value as PaymentStatus | 'All'); setPage(1); setMobilePage(1); }}
           className="px-2 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none"
         >
           <option value="All">All</option>
@@ -133,9 +151,9 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
         />
       ) : (
         <>
-          {/* Mobile card view */}
+          {/* Mobile card view — infinite scroll */}
           <div className="md:hidden space-y-3">
-            {paged.map((p) => (
+            {mobileItems.map((p) => (
               <div
                 key={p.id}
                 className={`bg-white rounded-2xl border p-4 ${p.daysOverdue > 0 ? 'border-red-200 bg-red-50/40' : 'border-slate-100'}`}
@@ -189,6 +207,15 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                 </div>
               </div>
             ))}
+            {/* Infinite scroll sentinel */}
+            {hasMoreMobile && (
+              <div ref={sentinelRef} className="py-4 flex justify-center">
+                <span className="text-xs text-slate-400">Loading more…</span>
+              </div>
+            )}
+            {!hasMoreMobile && filtered.length > PAGE_SIZE && (
+              <p className="text-center text-xs text-slate-400 py-3">All {filtered.length} records shown</p>
+            )}
           </div>
 
           {/* Desktop table view */}

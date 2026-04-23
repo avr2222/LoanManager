@@ -101,16 +101,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
           }
 
-          // Silently clean up stale pending payments older than 6 months
-          paymentsService.deleteOlderThan6Months().then((n) => {
-            if (n > 0) console.log(`[Cleanup] Removed ${n} stale payment(s) older than 6 months`);
-          });
-
           // Data already in Supabase — load it then auto-generate any missing payments
           bulkLoadLoans(l);
-          const cutoff6mo = new Date();
-          cutoff6mo.setMonth(cutoff6mo.getMonth() - 6);
-          bulkLoadPayments(p.filter((pay) => new Date(pay.dueDate) >= cutoff6mo));
+          bulkLoadPayments(p);
 
           const missing = buildMissingPayments(l, p);
           if (missing.length > 0) {
