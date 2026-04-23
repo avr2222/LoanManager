@@ -236,6 +236,7 @@ export function MediatorDashboardPage() {
 
   const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
 
+
   async function handleMarkReceived(paymentId: string) {
     const payment = myPayments.find((p) => p.id === paymentId);
     if (!payment) return;
@@ -384,7 +385,7 @@ export function MediatorDashboardPage() {
                 width={48}
               />
               <Tooltip
-                formatter={(value: any, name: any) => [formatCurrency(Number(value) || 0), String(name)]}
+                formatter={(value, name) => [formatCurrency(typeof value === 'number' ? value : 0), String(name ?? '')]}
                 contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid #e2e8f0' }}
               />
               <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
