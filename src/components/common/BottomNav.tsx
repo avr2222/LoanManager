@@ -17,20 +17,28 @@ export function BottomNav() {
   const navItems = isAdmin ? [...commonNav, ...adminOnlyNav] : commonNav;
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-100 md:hidden">
-      <div className={isAdmin ? 'grid grid-cols-4' : 'grid grid-cols-3'}>
+    <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/90 backdrop-blur-md border-t border-slate-200/60 md:hidden shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
+      <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'}`}>
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
-                isActive ? 'text-indigo-600' : 'text-slate-400'
+              `relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
+                isActive ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
               }`
             }
           >
-            <Icon size={20} />
-            {label}
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-b-full"
+                    style={{ background: 'linear-gradient(90deg, #6366f1, #4f46e5)' }} />
+                )}
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.75} />
+                {label}
+              </>
+            )}
           </NavLink>
         ))}
       </div>

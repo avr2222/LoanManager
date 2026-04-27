@@ -3,9 +3,12 @@ import type { Loan } from '@/types';
 
 export interface Profile {
   id: string;
-  role: 'admin' | 'mediator' | 'borrower';
+  role: 'admin' | 'mediator' | 'borrower' | 'user';
   phone: string;
-  displayName?: string | null;
+  fullName: string;
+  email: string;
+  isSuperAdmin: boolean;
+  displayName?: string | null;  // kept for backward compat
   isActive: boolean;
   disabledAt?: string | null;
   disabledBy?: string | null;
@@ -14,10 +17,13 @@ export interface Profile {
 function fromDbProfile(row: Record<string, unknown>): Profile {
   return {
     id:          row.id as string,
-    role:        (row.role as Profile['role']) ?? 'mediator',
+    role:        (row.role as Profile['role']) ?? 'user',
     phone:       (row.phone as string) ?? '',
+    fullName:    (row.full_name as string) ?? (row.display_name as string) ?? '',
+    email:       (row.email as string) ?? '',
+    isSuperAdmin: row.is_super_admin === true,
     displayName: (row.display_name as string | null) ?? null,
-    isActive:    row.is_active !== false, // default true if NULL
+    isActive:    row.is_active !== false,
     disabledAt:  (row.disabled_at as string | null) ?? null,
     disabledBy:  (row.disabled_by as string | null) ?? null,
   };
@@ -34,22 +40,37 @@ export const profilesService = {
     return fromDbProfile(data as Record<string, unknown>);
   },
 
-  // Admin: list all phone-user profiles
+  // Admin: list all non-super-admin profiles
   async listAll(): Promise<Profile[]> {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .neq('role', 'admin')
-      .order('phone', { ascending: true });
+      .eq('is_super_admin', false)
+      .order('full_name', { ascending: true });
     if (error) return [];
     return (data as Record<string, unknown>[]).map(fromDbProfile);
+  },
+
+  // Update full name and phone in profiles table
+  async updateProfile(userId: string, data: { fullName?: string; phone?: string }): Promise<{ error: string | null }> {
+    const updates: Record<string, unknown> = {};
+    if (data.fullName !== undefined) {
+      updates.full_name    = data.fullName.trim() || null;
+      updates.display_name = data.fullName.trim() || null; // keep in sync
+    }
+    if (data.phone !== undefined) {
+      updates.phone = data.phone.replace(/\D/g, '').slice(-10);
+    }
+    const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+    if (error) return { error: error.message };
+    return { error: null };
   },
 
   // Phone user: save their chosen display name to profiles table
   async updateDisplayName(userId: string, name: string): Promise<void> {
     await supabase
       .from('profiles')
-      .update({ display_name: name.trim() || null })
+      .update({ display_name: name.trim() || null, full_name: name.trim() || null })
       .eq('id', userId);
   },
 

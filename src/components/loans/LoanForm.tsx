@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Loan, LoanType, LoanStatus } from '@/types';
 import { deriveLoanFields } from '@/services/calculationService';
 import { generateLoanId } from '@/utils/idUtils';
 import { formatCurrency, ordinal } from '@/utils/formatUtils';
 import { useLoans } from '@/context/LoanContext';
+import { contactsService, type Contact } from '@/services/contactsService';
+import { PhoneAutocomplete } from '@/components/common/PhoneAutocomplete';
 
 interface LoanFormProps {
   initialValues?: Loan;
@@ -16,6 +18,11 @@ interface LoanFormProps {
   defaultLenderPhone?: string;
   /** If true, lender fields are read-only (phone users). Admin always gets editable fields. */
   lockLender?: boolean;
+  /** Pre-fill the borrower fields (when the logged-in user is the borrower) */
+  defaultBorrowerName?: string;
+  defaultBorrowerPhone?: string;
+  /** If true, borrower fields are read-only */
+  lockBorrower?: boolean;
   /** Pre-fill the mediator fields (when the logged-in user is the mediator) */
   defaultMediatorName?: string;
   defaultMediatorPhone?: string;
@@ -41,7 +48,7 @@ const defaultForm = {
   remarks: '',
 };
 
-export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLenderName, defaultLenderPhone, lockLender, defaultMediatorName, defaultMediatorPhone, lockMediator }: LoanFormProps) {
+export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLenderName, defaultLenderPhone, lockLender, defaultBorrowerName, defaultBorrowerPhone, lockBorrower, defaultMediatorName, defaultMediatorPhone, lockMediator }: LoanFormProps) {
   const { loans } = useLoans();
 
   // If myPhone is given (phone user), only suggest people from their own loans
@@ -75,6 +82,8 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
     ...defaultForm,
     lenderName:    defaultLenderName    ?? '',
     lenderPhone:   defaultLenderPhone   ?? '',
+    borrowerName:  defaultBorrowerName  ?? '',
+    borrowerPhone: defaultBorrowerPhone ?? '',
     mediatorName:  defaultMediatorName  ?? '',
     mediatorPhone: defaultMediatorPhone ?? '',
     // force Through Mediator when the logged-in user is the mediator
@@ -83,6 +92,11 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
 
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+
+  useEffect(() => {
+    contactsService.list().then(setContacts);
+  }, []);
 
   // Separate display state so typing "24" doesn't immediately jump to "2"
   const [rateDisplay, setRateDisplay] = useState(() =>
@@ -212,12 +226,13 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Lender Phone</label>
-            <input
-              className={`${inputClass('lenderPhone')} ${lockLender ? 'bg-slate-50 text-slate-500' : ''}`}
+            <PhoneAutocomplete
               value={form.lenderPhone}
-              onChange={(e) => set('lenderPhone', e.target.value)}
-              placeholder="10-digit number"
+              onChange={(v) => set('lenderPhone', v)}
+              onSelect={(c) => { setForm((prev) => ({ ...prev, lenderName: c.name, lenderPhone: c.phone })); setErrors((prev) => ({ ...prev, lenderName: undefined, lenderPhone: undefined })); }}
+              contacts={contacts}
               readOnly={!!lockLender}
+              className={`${inputClass('lenderPhone')} ${lockLender ? 'bg-slate-50 text-slate-500' : ''}`}
             />
           </div>
         </div>
@@ -226,12 +241,15 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
       {/* Borrower Details */}
       <fieldset>
         <legend className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 pb-1 border-b border-slate-100 w-full">
-          Borrower Details
+          Borrower Details{' '}
+          {defaultBorrowerPhone
+            ? <span className="normal-case font-normal text-emerald-500 ml-1">— you are the borrower</span>
+            : null}
         </legend>
         <div className="space-y-3">
 
-          {/* Existing borrower picker */}
-          {knownBorrowers.length > 0 && (
+          {/* Existing borrower picker — hidden when borrower is locked */}
+          {knownBorrowers.length > 0 && !lockBorrower && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Select Existing Borrower</label>
               <select
@@ -254,17 +272,25 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
 
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Full Name *</label>
-            <input className={inputClass('borrowerName')} value={form.borrowerName} onChange={(e) => set('borrowerName', e.target.value)} placeholder="Enter borrower name" />
+            <input
+              className={`${inputClass('borrowerName')} ${lockBorrower ? 'bg-slate-50 text-slate-500' : ''}`}
+              value={form.borrowerName}
+              onChange={(e) => set('borrowerName', e.target.value)}
+              placeholder="Enter borrower name"
+              readOnly={!!lockBorrower}
+            />
             {errors.borrowerName && <p className="text-red-500 text-xs mt-1">{errors.borrowerName}</p>}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Phone No.</label>
-              <input
-                className={inputClass('borrowerPhone')}
+              <PhoneAutocomplete
                 value={form.borrowerPhone}
-                onChange={(e) => set('borrowerPhone', e.target.value)}
-                placeholder="10-digit number"
+                onChange={(v) => set('borrowerPhone', v)}
+                onSelect={(c) => { setForm((prev) => ({ ...prev, borrowerName: c.name, borrowerPhone: c.phone })); setErrors((prev) => ({ ...prev, borrowerName: undefined, borrowerPhone: undefined })); }}
+                contacts={contacts}
+                readOnly={!!lockBorrower}
+                className={`${inputClass('borrowerPhone')} ${lockBorrower ? 'bg-slate-50 text-slate-500' : ''}`}
               />
             </div>
             <div>
@@ -396,12 +422,13 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Mediator Phone</label>
-                <input
-                  className={`${inputClass('mediatorPhone')} ${lockMediator ? 'bg-slate-50 text-slate-500' : ''}`}
+                <PhoneAutocomplete
                   value={form.mediatorPhone}
-                  onChange={(e) => set('mediatorPhone', e.target.value)}
-                  placeholder="10-digit number"
+                  onChange={(v) => set('mediatorPhone', v)}
+                  onSelect={(c) => { setForm((prev) => ({ ...prev, mediatorName: c.name, mediatorPhone: c.phone })); setErrors((prev) => ({ ...prev, mediatorName: undefined, mediatorPhone: undefined })); }}
+                  contacts={contacts}
                   readOnly={!!lockMediator}
+                  className={`${inputClass('mediatorPhone')} ${lockMediator ? 'bg-slate-50 text-slate-500' : ''}`}
                 />
               </div>
               <div className="sm:col-span-2">

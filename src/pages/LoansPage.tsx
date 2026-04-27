@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Loan, LoanStatus } from '@/types';
 import { useLoans } from '@/context/LoanContext';
 import { usePayments } from '@/context/PaymentContext';
@@ -9,15 +10,21 @@ import { LoanForm } from '@/components/loans/LoanForm';
 import { LoanTable } from '@/components/loans/LoanTable';
 import { useAuth } from '@/context/AuthContext';
 
+type RoleFilter = 'All' | 'Lender' | 'Borrower' | 'Mediator';
+
 export function LoansPage() {
   const { loans, addLoan, updateLoan, deleteLoan, setLoanStatus } = useLoans();
-  const { isAdmin, hasFullAccess, userPhone, displayName } = useAuth();
+  const { isAdmin, hasFullAccess, userPhone, displayName, phone, user } = useAuth();
   const { deletePaymentsByLoan } = usePayments();
   const { showSuccess, showError } = useToast();
+  const navigate = useNavigate();
+
+  const myPhone = phone.replace(/\D/g, '').slice(-10);
 
   const [showForm, setShowForm] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | undefined>();
   const [deletingLoanId, setDeletingLoanId] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('All');
 
   async function handleAdd(loan: Loan) {
     try {
@@ -60,12 +67,31 @@ export function LoansPage() {
     }
   }
 
-  // Phone users with hasFullAccess can edit/delete only loans they own (as lender)
+  // Loans the current user can edit/delete: matches by UUID creator_id first,
+  // then falls back to phone match for legacy loans without creator_id.
   const ownedLoanIds = useMemo(() => {
     if (isAdmin) return undefined;           // admin acts on all
     if (!hasFullAccess) return new Set<string>(); // view-only
-    return new Set(loans.filter((l) => l.lenderPhone === userPhone || l.borrowerPhone === userPhone).map((l) => l.loanId));
-  }, [isAdmin, hasFullAccess, loans, userPhone]);
+    return new Set(loans.filter((l) =>
+      (user && l.creatorId === user.id) ||
+      (myPhone && (
+        l.lenderPhone?.replace(/\D/g, '').slice(-10) === myPhone ||
+        l.borrowerPhone?.replace(/\D/g, '').slice(-10) === myPhone
+      ))
+    ).map((l) => l.loanId));
+  }, [isAdmin, hasFullAccess, loans, user, myPhone]);
+
+  // Role filter — only relevant when user has a phone and is a non-admin
+  const roleFilteredLoans = useMemo(() => {
+    if (roleFilter === 'All' || !myPhone) return loans;
+    return loans.filter((l) => {
+      const norm = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
+      if (roleFilter === 'Lender')   return norm(l.lenderPhone) === myPhone;
+      if (roleFilter === 'Borrower') return norm(l.borrowerPhone) === myPhone;
+      if (roleFilter === 'Mediator') return norm(l.mediatorPhone) === myPhone;
+      return true;
+    });
+  }, [loans, roleFilter, myPhone]);
 
   const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
 
@@ -74,23 +100,47 @@ export function LoansPage() {
       {/* Summary strip */}
       <div className="grid grid-cols-3 gap-2 md:gap-3 mb-5">
         {[
-          { label: 'Total Loans', value: loans.length },
-          { label: 'Active', value: loans.filter((l) => l.loanStatus === 'Active').length },
-          { label: 'Closed / Other', value: loans.filter((l) => l.loanStatus !== 'Active').length },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-white rounded-2xl border border-slate-100 px-3 md:px-5 py-3 md:py-4">
-            <p className="text-[10px] md:text-xs font-medium text-slate-400 uppercase tracking-widest">{label}</p>
-            <p className="text-xl md:text-2xl font-bold text-slate-900 mt-1">{value}</p>
+          { label: 'Total Loans',  value: roleFilteredLoans.length,                                             accent: 'from-slate-50  to-white',       dot: 'bg-slate-300'   },
+          { label: 'Active',       value: roleFilteredLoans.filter((l) => l.loanStatus === 'Active').length,    accent: 'from-emerald-50 to-white',      dot: 'bg-emerald-400' },
+          { label: 'Closed / Other', value: roleFilteredLoans.filter((l) => l.loanStatus !== 'Active').length, accent: 'from-slate-50  to-white',       dot: 'bg-slate-300'   },
+        ].map(({ label, value, accent, dot }) => (
+          <div key={label} className={`bg-gradient-to-br ${accent} rounded-2xl border border-slate-200/60 shadow-sm px-3 md:px-5 py-3 md:py-4`}>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+              <p className="text-[10px] md:text-[11px] font-semibold text-slate-400 uppercase tracking-widest">{label}</p>
+            </div>
+            <p className="text-2xl md:text-3xl font-bold text-slate-900 tabular-nums">{value}</p>
           </div>
         ))}
       </div>
 
+      {/* Role filter chips */}
+      {myPhone && !isAdmin && (
+        <div className="flex gap-1.5 mb-4 flex-wrap">
+          {(['All', 'Lender', 'Borrower', 'Mediator'] as RoleFilter[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRoleFilter(r)}
+              className={`px-3.5 py-1 text-xs font-semibold rounded-full border transition-all ${
+                roleFilter === r
+                  ? 'text-white border-transparent shadow-sm shadow-indigo-200'
+                  : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-600'
+              }`}
+              style={roleFilter === r ? { background: 'linear-gradient(135deg, #6366f1, #4f46e5)' } : {}}
+            >
+              {r === 'All' ? 'All Loans' : `As ${r}`}
+            </button>
+          ))}
+        </div>
+      )}
+
       <LoanTable
-        loans={loans}
+        loans={roleFilteredLoans}
         onEdit={(loan) => setEditingLoan(loan)}
         onDelete={(id) => setDeletingLoanId(id)}
         onSetStatus={handleSetStatus}
         onAdd={() => setShowForm(true)}
+        onRowClick={(loan) => navigate(`/loans/${loan.loanId}`)}
         readOnly={!isAdmin && !hasFullAccess}
         ownedLoanIds={ownedLoanIds}
         userPhone={userPhone}

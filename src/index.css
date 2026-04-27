@@ -9,11 +9,47 @@ body {
   font-family: 'Inter', system-ui, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f9fafb;
-  color: #111827;
+  background-color: #f8fafc;
+  color: #0f172a;
+  letter-spacing: -0.01em;
 }
 
 #root {
   width: 100%;
   min-height: 100vh;
+}
+
+/* Refined scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Smooth focus rings */
+:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+/* Tabular numbers for financial data */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Subtle page background pattern */
+.page-bg {
+  background-color: #f8fafc;
+  background-image: radial-gradient(circle at 1px 1px, #e2e8f0 1px, transparent 0);
+  background-size: 24px 24px;
 }

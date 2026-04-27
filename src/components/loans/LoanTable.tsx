@@ -11,6 +11,7 @@ interface LoanTableProps {
   onDelete: (loanId: string) => void;
   onSetStatus: (loanId: string, status: LoanStatus) => void;
   onAdd: () => void;
+  onRowClick?: (loan: Loan) => void;
   readOnly?: boolean;
   /** undefined = admin (all loans); empty Set = none; Set with ids = owned loans */
   ownedLoanIds?: Set<string>;
@@ -20,7 +21,7 @@ interface LoanTableProps {
 
 type SortKey = 'loanId' | 'borrowerName' | 'principalAmount' | 'monthlyInterestAmount' | 'loanStatus' | 'dateGiven';
 
-export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnly, ownedLoanIds, userPhone }: LoanTableProps) {
+export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowClick, readOnly, ownedLoanIds, userPhone }: LoanTableProps) {
   const canAct = (loan: Loan) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(loan.loanId));
 
   // For mediators viewing their own loans, show lender name ("From: X") instead of their own name
@@ -148,7 +149,11 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnl
           {/* Mobile card view — infinite scroll */}
           <div className="md:hidden space-y-3">
             {mobileItems.map((loan) => (
-              <div key={loan.loanId} className="bg-white rounded-2xl border border-slate-100 p-4">
+              <div
+                key={loan.loanId}
+                className={`bg-white rounded-2xl border border-slate-100 p-4 ${onRowClick ? 'cursor-pointer hover:border-indigo-200' : ''}`}
+                onClick={() => onRowClick?.(loan)}
+              >
                 <div className="flex items-start justify-between">
                   <div>
                     <span className="text-xs font-mono font-semibold text-indigo-500">{loan.loanId}</span>
@@ -156,7 +161,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnl
                     <p className="text-xs text-slate-400">{loan.borrowerPhone}</p>
                   </div>
                   {canAct(loan) && (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => onEdit(loan)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={15} /></button>
                       {loan.loanStatus === 'Active' && (
                         <button onClick={() => onSetStatus(loan.loanId, 'Closed')} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg" title="Close loan"><XCircle size={15} /></button>
@@ -216,7 +221,11 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnl
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {paged.map((loan) => (
-                    <tr key={loan.loanId} className="hover:bg-slate-50/60 transition-colors">
+                    <tr
+                      key={loan.loanId}
+                      className={`hover:bg-slate-50/60 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                      onClick={() => onRowClick?.(loan)}
+                    >
                       <td className="px-4 py-3 text-xs font-mono font-semibold text-indigo-500">{loan.loanId}</td>
                       <td className="px-4 py-3">
                         <div className="text-sm font-medium text-slate-800">{loan.borrowerName}</div>
@@ -230,7 +239,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, readOnl
                       <td className="px-4 py-3 text-sm font-semibold text-emerald-600">{formatCurrency(loan.netMonthlyReceipt)}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{formatDate(loan.dateGiven)}</td>
                       <td className="px-4 py-3"><StatusBadge status={loan.loanStatus} /></td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         {canAct(loan) && (
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => onEdit(loan)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg" title="Edit"><Edit2 size={14} /></button>

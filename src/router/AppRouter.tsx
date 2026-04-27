@@ -1,12 +1,14 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/common/AppShell';
 import { MediatorDashboardPage } from '@/pages/MediatorDashboardPage';
+import { LoanDetailPage } from '@/pages/LoanDetailPage';
 import { AddLoanPage } from '@/pages/AddLoanPage';
 import { LoansPage } from '@/pages/LoansPage';
 import { PaymentsPage } from '@/pages/PaymentsPage';
 import { ImportPage } from '@/pages/ImportPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { RegisterPage } from '@/pages/RegisterPage';
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
 import { SetPasswordPage } from '@/pages/SetPasswordPage';
 import { useAuth } from '@/context/AuthContext';
@@ -28,8 +30,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 }
 
 function AdminOnly({ children }: { children: React.ReactNode }) {
-  const { isAdmin } = useAuth();
-  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  const { isSuperAdmin } = useAuth();
+  if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -43,7 +45,8 @@ export function AppRouter() {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login"    element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route
           path="/"
           element={
@@ -57,6 +60,7 @@ export function AppRouter() {
           <Route path="set-password" element={<SetPasswordPage />} />
           <Route path="add-loan"     element={<FullAccessOnly><AddLoanPage /></FullAccessOnly>} />
           <Route path="loans"        element={<LoansPage />} />
+          <Route path="loans/:id"    element={<LoanDetailPage />} />
           <Route path="payments"     element={<PaymentsPage />} />
           <Route path="users"        element={<AdminOnly><UsersPage /></AdminOnly>} />
           <Route path="import"       element={<AdminOnly><ImportPage /></AdminOnly>} />

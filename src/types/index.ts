@@ -33,6 +33,8 @@ export interface Loan {
   updatedAt: string;
   deletedAt?: string | null;        // soft-delete timestamp (null = active)
   deletedBy?: string | null;        // phone or email of who deleted it
+  creatorId?: string;               // auth.users.id of who created this loan record
+  confirmationStatus?: 'Pending' | 'Confirmed' | 'Disputed';
 }
 
 // ── Monthly Payment ───────────────────────────────────────────────────────────

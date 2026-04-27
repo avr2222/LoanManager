@@ -1,204 +1,141 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { HandCoins, LogIn, Eye, EyeOff, Mail, Phone } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { HandCoins, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
-
-function detectType(value: string): 'email' | 'phone' | null {
-  const v = value.trim();
-  if (!v) return null;
-  if (v.includes('@')) return 'email';
-  if (/^[\d\s\-+()]{7,}$/.test(v)) return 'phone';
-  return null;
-}
 
 export function LoginPage() {
-  const { signIn, signInWithPhone, user } = useAuth();
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [identifier, setIdentifier]             = useState('');
-  const [password, setPassword]                 = useState('');
-  const [showPassword, setShowPassword]         = useState(false);
-  const [error, setError]                       = useState('');
-  const [loading, setLoading]                   = useState(false);
-  const [showForgot, setShowForgot]             = useState(false);
-  const [passwordRequired, setPasswordRequired] = useState(false);
-  const passwordRef = useRef<HTMLInputElement>(null);
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError]               = useState('');
+  const [loading, setLoading]           = useState(false);
 
-  const inputType = detectType(identifier);
-  const isPhone   = inputType === 'phone';
-  const showPasswordField = inputType === 'email' || inputType === 'phone';
-  const canSubmit = !!inputType && (inputType === 'email' ? password.length > 0 : true);
+  useEffect(() => {
+    const pre = searchParams.get('email');
+    if (pre) setEmail(pre);
+  }, [searchParams]);
 
   useEffect(() => {
     if (user) navigate('/dashboard', { replace: true });
   }, [user, navigate]);
 
-  useEffect(() => {
-    if (inputType === 'email') {
-      setTimeout(() => passwordRef.current?.focus(), 50);
-    }
-  }, [inputType]);
-
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!identifier.trim() || !inputType) { setError('Enter your email or phone number'); return; }
-    if (inputType === 'email' && !password) { setError('Enter your password'); return; }
+    if (!email.trim())    { setError('Enter your email');    return; }
+    if (!password.trim()) { setError('Enter your password'); return; }
 
     setError('');
     setLoading(true);
-
-    let authError: string | null = null;
-
-    if (inputType === 'email') {
-      const result = await signIn(identifier.trim(), password);
-      authError = result.error;
-    } else {
-      const cleaned = identifier.replace(/\D/g, '').slice(-10);
-      const result  = await signInWithPhone(cleaned, password || undefined);
-      authError = result.error;
-    }
-
-    if (authError === 'password_required') {
-      setPasswordRequired(true);
-      setError('Enter your password to sign in, or use "Forgot password?" to reset it.');
-      setTimeout(() => passwordRef.current?.focus(), 50);
-    } else if (authError) {
-      setError(authError);
-    } else {
-      navigate('/dashboard', { replace: true });
-    }
-
+    const { error: err } = await signIn(email.trim(), password);
+    if (err) setError(err);
     setLoading(false);
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{ background: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99,102,241,0.08) 0%, transparent 70%), #f8fafc' }}>
+
+      {/* Decorative blobs */}
+      <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full opacity-20 blur-3xl pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }} />
+      <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full opacity-10 blur-3xl pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #4f46e5, transparent)' }} />
+
+      <div className="w-full max-w-sm relative z-10">
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-500 rounded-2xl mb-4 shadow-lg">
-            <HandCoins size={22} className="text-white" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5 shadow-xl shadow-indigo-500/20"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}>
+            <HandCoins size={24} className="text-white" />
           </div>
-          <h1 className="text-xl font-bold text-slate-900">Loan Book</h1>
-          <p className="text-slate-400 text-sm mt-1">Sign in to continue</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Welcome back</h1>
+          <p className="text-slate-400 text-sm mt-1.5">Sign in to your Loan Book</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
 
-            {/* Identifier */}
+            {/* Email */}
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">
-                Email or Phone number
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+                Email
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  autoComplete="username"
-                  autoFocus
-                  value={identifier}
-                  onChange={(e) => {
-                    setIdentifier(e.target.value);
-                    setError('');
-                    setPasswordRequired(false);
-                    setPassword('');
-                  }}
-                  placeholder="email@example.com or 9876543210"
-                  className="w-full px-3.5 py-2.5 pr-10 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"
-                />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {inputType === 'email' && <Mail  size={15} className="text-indigo-400" />}
-                  {inputType === 'phone' && <Phone size={15} className="text-emerald-500" />}
-                  {inputType === null && identifier && <span className="w-2 h-2 rounded-full bg-amber-400 block" />}
-                </div>
-              </div>
-              {inputType === 'email' && (
-                <p className="text-xs text-indigo-500 mt-1.5 flex items-center gap-1">
-                  <Mail size={11} /> Admin login
-                </p>
-              )}
-              {isPhone && !passwordRequired && (
-                <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
-                  <Phone size={11} /> Enter password for full access, or leave blank to view only
-                </p>
-              )}
+              <input
+                type="email"
+                autoComplete="email"
+                autoFocus
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                placeholder="you@example.com"
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 placeholder:text-slate-300 transition-all"
+              />
             </div>
 
             {/* Password */}
-            {showPasswordField && (
-              <div className="animate-in fade-in slide-in-from-top-1 duration-150">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-medium text-slate-500">
-                    Password
-                    {isPhone && !passwordRequired && (
-                      <span className="text-slate-400 font-normal ml-1">(optional)</span>
-                    )}
-                  </label>
-                  {isPhone && (
-                    <button
-                      type="button"
-                      onClick={() => setShowForgot(true)}
-                      className="text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
-                    >
-                      Forgot password?
-                    </button>
-                  )}
-                </div>
-                <div className="relative">
-                  <input
-                    ref={passwordRef}
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                    placeholder={isPhone && !passwordRequired ? 'Leave blank for view-only access' : '••••••••'}
-                    className="w-full px-3.5 py-2.5 pr-10 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 pr-10 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 placeholder:text-slate-300 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
               </div>
-            )}
+            </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-100 text-red-600 text-xs px-3.5 py-2.5 rounded-xl">
-                {error}
+              <div className="bg-red-50 border border-red-100 text-red-600 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2">
+                <span className="mt-0.5">⚠</span>
+                <span>{error}</span>
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loading || !canSubmit}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-indigo-500 rounded-xl hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              disabled={loading || !email.trim() || !password.trim()}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white rounded-xl shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
             >
-              {loading
-                ? <span className="animate-pulse">Signing in…</span>
-                : <><LogIn size={15} /> Sign In</>
-              }
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Signing in…
+                </span>
+              ) : (
+                <>Sign In <ArrowRight size={14} /></>
+              )}
             </button>
           </form>
         </div>
 
-      </div>
+        <p className="text-center text-sm text-slate-400 mt-5">
+          Have an invitation?{' '}
+          <Link
+            to="/register"
+            className="text-indigo-500 hover:text-indigo-700 font-semibold transition-colors"
+          >
+            Create account
+          </Link>
+        </p>
 
-      {showForgot && (
-        <ForgotPasswordModal
-          phone={identifier.replace(/\D/g, '').slice(-10)}
-          onClose={() => setShowForgot(false)}
-          onSuccess={() => {
-            setShowForgot(false);
-            setError('');
-            setPassword('');
-          }}
-        />
-      )}
+      </div>
     </div>
   );
 }
