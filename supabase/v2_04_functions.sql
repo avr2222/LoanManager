@@ -7,6 +7,11 @@
 --    Defined first because all subsequent functions depend on it.
 --    Strips non-digits and returns the last 10 digits.
 --    Returns '' for NULL or empty input (never errors).
+--
+--    DROP first: CREATE OR REPLACE cannot rename parameters.
+--    CASCADE drops dependent functions/policies — all recreated below.
+
+DROP FUNCTION IF EXISTS public.norm_phone(text) CASCADE;
 
 CREATE OR REPLACE FUNCTION public.norm_phone(p_phone TEXT)
 RETURNS TEXT

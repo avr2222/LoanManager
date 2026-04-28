@@ -29,9 +29,21 @@ ALTER TABLE public.loans
   ALTER COLUMN creator_id SET DEFAULT auth.uid();
 
 -- ── 3b. CHECK constraints on text-enum columns ───────────────
-ALTER TABLE public.loans
-  ADD CONSTRAINT IF NOT EXISTS chk_loan_confirmation_status
-    CHECK (confirmation_status IN ('Pending', 'Confirmed', 'Disputed'));
+--    ADD CONSTRAINT IF NOT EXISTS is not valid PostgreSQL syntax.
+--    Use a DO block to guard against re-run errors.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_schema = 'public'
+      AND table_name        = 'loans'
+      AND constraint_name   = 'chk_loan_confirmation_status'
+  ) THEN
+    ALTER TABLE public.loans
+      ADD CONSTRAINT chk_loan_confirmation_status
+        CHECK (confirmation_status IN ('Pending', 'Confirmed', 'Disputed'));
+  END IF;
+END $$;
 
 -- ── 4. Indexes for new columns ────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_loans_creator_id
