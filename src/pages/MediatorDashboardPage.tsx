@@ -148,9 +148,18 @@ export function MediatorDashboardPage() {
     return payments.filter((p) => allMyLoanIds.has(p.loanId));
   }, [payments, allMyLoanIds, isAdmin, isViewAs]);
 
+  // Claimed by borrower, awaiting lender verification
+  const claimedPayments = useMemo(() =>
+    myPayments
+      .filter((p) => p.paymentStatus === 'Claimed')
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()),
+    [myPayments]
+  );
+
+  // Overdue excludes claimed (borrower has already initiated payment)
   const overduePayments = useMemo(() =>
     myPayments
-      .filter((p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived')
+      .filter((p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && p.paymentStatus !== 'Claimed')
       .sort((a, b) => b.daysOverdue - a.daysOverdue),
     [myPayments]
   );
@@ -160,7 +169,7 @@ export function MediatorDashboardPage() {
     const in45  = new Date(today.getTime() + 45 * 24 * 60 * 60 * 1000);
     return myPayments
       .filter((p) => {
-        if (p.paymentStatus === 'Received' || p.paymentStatus === 'Waived') return false;
+        if (p.paymentStatus === 'Received' || p.paymentStatus === 'Waived' || p.paymentStatus === 'Claimed') return false;
         if (p.daysOverdue > 0) return false;
         const due = new Date(p.dueDate);
         return due >= today && due <= in45;
@@ -262,6 +271,24 @@ export function MediatorDashboardPage() {
 
   const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
 
+
+  async function handleVerifyPayment(paymentId: string) {
+    const payment = myPayments.find((p) => p.id === paymentId);
+    if (!payment) return;
+    const today = new Date().toISOString().split('T')[0];
+    const updated = derivePaymentFields({
+      ...payment,
+      amountReceived: payment.netAmountExpected,
+      dateReceived: today,
+      paymentStatus: 'Received',
+    });
+    try {
+      await updatePayment(updated);
+      showSuccess(`Verified — ${payment.borrowerName} ${payment.monthYear} marked as received`);
+    } catch {
+      showError('Failed to verify payment');
+    }
+  }
 
   async function handleMarkReceived(paymentId: string) {
     const payment = myPayments.find((p) => p.id === paymentId);
@@ -432,6 +459,90 @@ export function MediatorDashboardPage() {
               )}
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── Pending Verification (borrower claimed, lender to confirm) ── */}
+      {claimedPayments.length > 0 && (
+        <div className="bg-white rounded-2xl border border-violet-100 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-violet-100 flex items-center justify-between"
+            style={{ background: 'linear-gradient(135deg, #f5f3ff, #fff)' }}>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-violet-500" />
+              <p className="text-xs font-semibold text-violet-700 uppercase tracking-widest">
+                {lenderLoanIds.size > 0 ? 'Pending Verification' : 'Awaiting Confirmation'}
+              </p>
+            </div>
+            <span className="text-xs font-bold text-white bg-violet-500 px-2 py-0.5 rounded-full">
+              {claimedPayments.length}
+            </span>
+          </div>
+
+          {/* Mobile */}
+          <div className="md:hidden divide-y divide-slate-50">
+            {claimedPayments.map((p) => (
+              <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</p>
+                  <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
+                  <p className="text-xs text-violet-600 mt-0.5">{p.monthYear} · {p.dueDate}</p>
+                  {p.remarks && p.remarks.includes('UTR:') && (
+                    <p className="text-xs text-slate-400 mt-0.5">{p.remarks.slice(p.remarks.indexOf('UTR:'))}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasFullAccess && lenderLoanIds.has(p.loanId) && (
+                    <button onClick={() => handleVerifyPayment(p.id)}
+                      className="flex items-center gap-1 text-xs font-semibold text-white bg-violet-500 hover:bg-violet-600 active:scale-95 px-2.5 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
+                      <CheckCircle2 size={13} /> Verify
+                    </button>
+                  )}
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-violet-600">{formatCurrency(p.netAmountExpected)}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Claimed</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop */}
+          <table className="hidden md:table min-w-full">
+            <thead>
+              <tr className="border-b border-violet-50">
+                {['Loan', 'Borrower', 'Month', 'Due Date', 'Amount', 'UTR / Note', ''].map((h) => (
+                  <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {claimedPayments.map((p) => (
+                <tr key={p.id} className="border-t border-violet-50 hover:bg-violet-50/20">
+                  <td className="px-5 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
+                  <td className="px-5 py-3 text-sm font-medium text-slate-800">{p.borrowerName}</td>
+                  <td className="px-5 py-3 text-sm text-slate-600">{p.monthYear}</td>
+                  <td className="px-5 py-3 text-sm text-slate-500">{p.dueDate}</td>
+                  <td className="px-5 py-3 text-sm font-semibold text-violet-600">{formatCurrency(p.netAmountExpected)}</td>
+                  <td className="px-5 py-3 text-xs text-slate-400">
+                    {p.remarks?.includes('UTR:')
+                      ? p.remarks.slice(p.remarks.indexOf('UTR:'))
+                      : <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-5 py-3">
+                    {hasFullAccess && lenderLoanIds.has(p.loanId) && (
+                      <button onClick={() => handleVerifyPayment(p.id)}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-white bg-violet-500 hover:bg-violet-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
+                        <CheckCircle2 size={13} /> Verify & Confirm
+                      </button>
+                    )}
+                    {borrowerLoanIds.has(p.loanId) && (
+                      <span className="text-xs text-violet-600 font-medium">Awaiting lender</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

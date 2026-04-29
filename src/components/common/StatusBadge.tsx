@@ -12,6 +12,7 @@ const statusStyles: Record<string, string> = {
   Pending:      'bg-orange-50 text-orange-600 ring-orange-200',
   Waived:       'bg-slate-100 text-slate-500 ring-slate-200',
   Partial:      'bg-blue-50 text-blue-600 ring-blue-200',
+  Claimed:      'bg-violet-50 text-violet-700 ring-violet-200',
 };
 
 export function StatusBadge({ status, label }: StatusBadgeProps) {

@@ -37,6 +37,7 @@ interface PaymentContextValue {
   payments: Payment[];
   addPayment: (payment: Payment) => Promise<void>;
   updatePayment: (payment: Payment) => Promise<void>;
+  claimPayment: (payment: Payment, utrNumber: string) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
   restorePayment: (id: string) => Promise<void>;
   deletePaymentsByLoan: (loanId: string) => Promise<void>;
@@ -60,6 +61,20 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'UPDATE', payload: derived });
   }, []);
 
+  const claimPayment = useCallback(async (payment: Payment, utrNumber: string) => {
+    await paymentsService.claimPayment(payment.id, utrNumber);
+    const remarksWithUtr = utrNumber.trim()
+      ? `${payment.remarks ? payment.remarks + ' ' : ''}UTR: ${utrNumber.trim()}`
+      : payment.remarks;
+    const claimed = derivePaymentFields({
+      ...payment,
+      paymentStatus: 'Claimed',
+      amountReceived: payment.netAmountExpected,
+      remarks: remarksWithUtr,
+    });
+    dispatch({ type: 'UPDATE', payload: claimed });
+  }, []);
+
   const deletePayment = useCallback(async (id: string) => {
     await paymentsService.delete(id);
     dispatch({ type: 'DELETE', payload: id });
@@ -80,7 +95,7 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <PaymentContext.Provider value={{ payments, addPayment, updatePayment, deletePayment, restorePayment, deletePaymentsByLoan, bulkLoadPayments }}>
+    <PaymentContext.Provider value={{ payments, addPayment, updatePayment, claimPayment, deletePayment, restorePayment, deletePaymentsByLoan, bulkLoadPayments }}>
       {children}
     </PaymentContext.Provider>
   );

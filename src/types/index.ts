@@ -2,7 +2,7 @@
 
 export type LoanType = 'Direct' | 'Through Mediator';
 export type LoanStatus = 'Active' | 'Closed' | 'Defaulted' | 'Restructured';
-export type PaymentStatus = 'Received' | 'Pending' | 'Waived' | 'Partial';
+export type PaymentStatus = 'Received' | 'Pending' | 'Waived' | 'Partial' | 'Claimed';
 
 // ── Loan Master ───────────────────────────────────────────────────────────────
 

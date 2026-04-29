@@ -310,6 +310,17 @@ export const paymentsService = {
       .not('deleted_at', 'is', null);
     if (error) throw error;
   },
+
+  // Borrower claims they've paid via UPI (or any method).
+  // Uses a SECURITY DEFINER RPC because borrowers cannot directly UPDATE payment rows.
+  // Sets status='Claimed', amountReceived=netAmountExpected, stores UTR in remarks.
+  async claimPayment(paymentId: string, utrNumber: string): Promise<void> {
+    const { error } = await supabase.rpc('claim_payment', {
+      p_payment_id: paymentId,
+      p_utr_number: utrNumber,
+    });
+    if (error) throw error;
+  },
 };
 
 // ── Audit Log ──────────────────────────────────────────────────────────────────

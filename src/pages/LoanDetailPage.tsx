@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLoans } from '@/context/LoanContext';
 import { usePayments } from '@/context/PaymentContext';
@@ -13,7 +13,7 @@ import {
 } from '@/services/confirmationsService';
 import { profilesService } from '@/services/profilesService';
 import { formatCurrency, ordinal } from '@/utils/formatUtils';
-import { ChevronLeft, CheckCircle, XCircle, Clock, Edit2, MessageSquare, Smartphone } from 'lucide-react';
+import { ChevronLeft, CheckCircle, XCircle, Clock, Edit2, MessageSquare, Smartphone, ArrowRight } from 'lucide-react';
 import type { Loan } from '@/types';
 
 const STATUS_CONFIG: Record<ConfirmationStatus, { icon: React.ReactNode; color: string; label: string }> = {
@@ -99,6 +99,7 @@ export function LoanDetailPage() {
   const { loans, updateLoan } = useLoans();
   const { payments } = usePayments();
   const { phone, user, isSuperAdmin, hasFullAccess } = useAuth();
+  const { claimPayment } = usePayments();
   const { showSuccess, showError } = useToast();
 
   const myPhone = phone.replace(/\D/g, '').slice(-10);
@@ -113,6 +114,10 @@ export function LoanDetailPage() {
   const [offlineConfirmId, setOfflineConfirmId] = useState<string | null>(null);
   const [payUpiId, setPayUpiId] = useState('');
   const [payUpiName, setPayUpiName] = useState('');
+  const [showUpiModal, setShowUpiModal] = useState(false);
+  const [upiStep, setUpiStep] = useState<'initiate' | 'confirm'>('initiate');
+  const [utrInput, setUtrInput] = useState('');
+  const [claiming, setClaiming] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -210,6 +215,41 @@ export function LoanDetailPage() {
   const isBorrower = !!myNormPhone && loan.borrowerPhone?.replace(/\D/g, '').slice(-10) === myNormPhone;
   const offlineConf = confirmations.find((x) => x.id === offlineConfirmId);
 
+  // Earliest unclaimed/unpaid payment — used for the UPI pay flow
+  const targetPayment = useMemo(() =>
+    [...loanPayments]
+      .filter((p) => p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && p.paymentStatus !== 'Claimed')
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0],
+    [loanPayments]
+  );
+
+  function openUpiModal() {
+    setUpiStep('initiate');
+    setUtrInput('');
+    setShowUpiModal(true);
+  }
+
+  function handleOpenUpiApp() {
+    const amount  = targetPayment?.netAmountExpected ?? loan.monthlyInterestAmount;
+    const note    = `Loan ${loan.loanId}${targetPayment ? ' ' + targetPayment.monthYear : ''}`;
+    window.location.href = `upi://pay?pa=${encodeURIComponent(payUpiId)}&pn=${encodeURIComponent(payUpiName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
+    setTimeout(() => setUpiStep('confirm'), 1500);
+  }
+
+  async function handleClaimPayment() {
+    if (!targetPayment) return;
+    setClaiming(true);
+    try {
+      await claimPayment(targetPayment, utrInput.trim());
+      showSuccess('Payment recorded — awaiting lender confirmation');
+      setShowUpiModal(false);
+    } catch {
+      showError('Failed to record payment');
+    } finally {
+      setClaiming(false);
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       {/* Back */}
@@ -244,15 +284,15 @@ export function LoanDetailPage() {
                 <Edit2 size={12} /> Edit
               </button>
             )}
-            {isBorrower && payUpiId && loan.loanStatus === 'Active' && (
-              <a
-                href={`upi://pay?pa=${encodeURIComponent(payUpiId)}&pn=${encodeURIComponent(payUpiName)}&am=${loan.monthlyInterestAmount}&cu=INR&tn=Loan+${loan.loanId}`}
+            {isBorrower && payUpiId && loan.loanStatus === 'Active' && targetPayment && (
+              <button
+                onClick={openUpiModal}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all"
                 style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
-                title={`Pay ₹${loan.monthlyInterestAmount} to ${payUpiName} (${payUpiId})`}
+                title={`Pay ${payUpiName} via UPI`}
               >
                 <Smartphone size={12} /> Pay via UPI
-              </a>
+              </button>
             )}
           </div>
         </div>
@@ -426,6 +466,91 @@ export function LoanDetailPage() {
             onConfirm={(note) => handleOfflineConfirm(offlineConfirmId, note)}
             onCancel={() => setOfflineConfirmId(null)}
           />
+        </Modal>
+      )}
+
+      {/* UPI Pay Modal */}
+      {showUpiModal && targetPayment && (
+        <Modal
+          title="Pay via UPI"
+          onClose={() => { setShowUpiModal(false); setUpiStep('initiate'); setUtrInput(''); }}
+        >
+          {upiStep === 'initiate' ? (
+            <div className="space-y-4">
+              {/* Payment summary */}
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Payment Details</p>
+                <p className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {formatCurrency(targetPayment.netAmountExpected)}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">{targetPayment.monthYear} · Due {targetPayment.dueDate}</p>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <ArrowRight size={12} className="text-slate-300" />
+                  <span className="text-sm font-medium text-slate-700">{payUpiName}</span>
+                  <span className="text-xs text-slate-400">({payUpiId})</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleOpenUpiApp}
+                className="w-full py-3 text-sm font-semibold text-white rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+              >
+                <Smartphone size={16} /> Open UPI App to Pay
+              </button>
+
+              <button
+                onClick={() => setUpiStep('confirm')}
+                className="w-full py-2.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors"
+              >
+                Already paid? Confirm here →
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+                <p className="text-sm font-semibold text-emerald-800">Confirm your payment</p>
+                <p className="text-xs text-emerald-600 mt-1">
+                  {formatCurrency(targetPayment.netAmountExpected)} to {payUpiName} · {targetPayment.monthYear}
+                </p>
+                <p className="text-xs text-emerald-600 mt-1.5">
+                  The lender will verify and mark it as received.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                  UTR / Transaction ID <span className="font-normal text-slate-400">(optional but recommended)</span>
+                </label>
+                <input
+                  type="text"
+                  value={utrInput}
+                  onChange={(e) => setUtrInput(e.target.value)}
+                  placeholder="e.g. 405816736148"
+                  className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 placeholder:text-slate-300 transition-all"
+                  autoFocus
+                />
+                <p className="text-xs text-slate-400 mt-1">Find this in Google Pay / PhonePe transaction history</p>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setUpiStep('initiate')}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  ← Back
+                </button>
+                <button
+                  onClick={handleClaimPayment}
+                  disabled={claiming}
+                  className="flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-xl hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none transition-all"
+                  style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                >
+                  {claiming ? 'Recording…' : "I've Paid — Record"}
+                </button>
+              </div>
+            </div>
+          )}
         </Modal>
       )}
     </div>

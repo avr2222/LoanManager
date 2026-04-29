@@ -4,7 +4,7 @@ import { HandCoins, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export function LoginPage() {
-  const { signIn, user } = useAuth();
+  const { signIn, signInWithPhone, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -25,13 +25,20 @@ export function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!email.trim())    { setError('Enter your email');    return; }
-    if (!password.trim()) { setError('Enter your password'); return; }
+    if (!email.trim())    { setError('Enter your email or mobile number'); return; }
+    if (!password.trim()) { setError('Enter your password');               return; }
 
     setError('');
     setLoading(true);
-    const { error: err } = await signIn(email.trim(), password);
-    if (err) setError(err);
+
+    // If input looks like a phone number, use phone login (creates @user.local email internally)
+    const cleaned = email.replace(/\D/g, '');
+    const isPhone = cleaned.length === 10;
+    const { error: err } = isPhone
+      ? await signInWithPhone(cleaned, password)
+      : await signIn(email.trim(), password);
+
+    if (err && err !== 'password_required') setError(err);
     setLoading(false);
   }
 
@@ -60,18 +67,19 @@ export function LoginPage() {
         <div className="bg-white rounded-2xl border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
 
-            {/* Email */}
+            {/* Email or Phone */}
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-                Email
+                Email or Mobile Number
               </label>
               <input
-                type="email"
-                autoComplete="email"
+                type="text"
+                inputMode="text"
+                autoComplete="username"
                 autoFocus
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setError(''); }}
-                placeholder="you@example.com"
+                placeholder="you@example.com or 9876543210"
                 className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 placeholder:text-slate-300 transition-all"
               />
             </div>
