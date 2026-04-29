@@ -111,8 +111,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             await paymentsService.bulkUpsert(missing);
             bulkLoadPayments([...p, ...missing]);
           }
-        } else {
-          // No data in Supabase — auto-import the bundled Excel file
+        } else if (isAdmin) {
+          // No data in Supabase — auto-import the bundled Excel file (admin only)
+          // Non-admin users returning 0 loans simply have no loans yet; don't import.
           setAutoImporting(true);
           try {
             const file = await fetchBundledExcel();
