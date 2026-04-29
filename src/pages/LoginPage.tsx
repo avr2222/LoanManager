@@ -65,7 +65,7 @@ export function LoginPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
 
             {/* Email or Phone */}
             <div>
