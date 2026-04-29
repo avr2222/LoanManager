@@ -22,6 +22,9 @@ export default defineConfig({
         orientation: 'portrait',
         scope: '/LoanManager/',
         start_url: '/LoanManager/',
+        id: '/LoanManager/',
+        categories: ['finance'],
+        lang: 'en',
         icons: [
           {
             src: 'pwa-64x64.png',
