@@ -8,13 +8,15 @@ import { usePayments } from './PaymentContext';
 import { useAuth } from './AuthContext';
 import type { Loan, Payment } from '@/types';
 
-// Generate payment entries from May 2026 → today for all active loans.
+// Generate payment entries from May 2026 → next month for all active loans.
 // Skips months already in existingPayments. Safe to call on every load (idempotent).
 const AUTO_GEN_FROM = new Date(2026, 4, 1); // May 1, 2026 — month is 0-indexed
 
 function buildMissingPayments(loans: Loan[], existingPayments: Payment[]): Payment[] {
   const have   = new Set(existingPayments.map((p) => `${p.loanId}::${p.monthYear}`));
   const now    = new Date();
+  const ahead  = new Date(now);
+  ahead.setMonth(ahead.getMonth() + 1); // generate 1 month ahead; handles Dec→Jan rollover
   const result: Payment[] = [];
 
   for (const loan of loans) {
@@ -24,7 +26,7 @@ function buildMissingPayments(loans: Loan[], existingPayments: Payment[]): Payme
     let yr = AUTO_GEN_FROM.getFullYear();
     let mo = AUTO_GEN_FROM.getMonth(); // 0-indexed
 
-    while (yr < now.getFullYear() || (yr === now.getFullYear() && mo <= now.getMonth())) {
+    while (yr < ahead.getFullYear() || (yr === ahead.getFullYear() && mo <= ahead.getMonth())) {
       const p = generateMonthlyPayment(loan, yr, mo);
       if (!have.has(`${loan.loanId}::${p.monthYear}`)) {
         result.push(p);
