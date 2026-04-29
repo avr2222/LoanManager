@@ -12,6 +12,7 @@ export interface Profile {
   isActive: boolean;
   disabledAt?: string | null;
   disabledBy?: string | null;
+  upiId: string;
 }
 
 function fromDbProfile(row: Record<string, unknown>): Profile {
@@ -26,6 +27,7 @@ function fromDbProfile(row: Record<string, unknown>): Profile {
     isActive:    row.is_active !== false,
     disabledAt:  (row.disabled_at as string | null) ?? null,
     disabledBy:  (row.disabled_by as string | null) ?? null,
+    upiId:       (row.upi_id as string) ?? '',
   };
 }
 
@@ -51,8 +53,8 @@ export const profilesService = {
     return (data as Record<string, unknown>[]).map(fromDbProfile);
   },
 
-  // Update full name and phone in profiles table
-  async updateProfile(userId: string, data: { fullName?: string; phone?: string }): Promise<{ error: string | null }> {
+  // Update full name, phone, and/or UPI ID in profiles table
+  async updateProfile(userId: string, data: { fullName?: string; phone?: string; upiId?: string }): Promise<{ error: string | null }> {
     const updates: Record<string, unknown> = {};
     if (data.fullName !== undefined) {
       updates.full_name    = data.fullName.trim() || null;
@@ -60,6 +62,9 @@ export const profilesService = {
     }
     if (data.phone !== undefined) {
       updates.phone = data.phone.replace(/\D/g, '').slice(-10);
+    }
+    if (data.upiId !== undefined) {
+      updates.upi_id = data.upiId.trim();
     }
     const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
     if (error) return { error: error.message };
@@ -129,5 +134,15 @@ export const profilesService = {
       .eq('role', role);
     if (error) return [];
     return (data as Record<string, unknown>[]).map(fromDbProfile);
+  },
+
+  // Fetch UPI ID for a phone number — used by borrowers to pay their lender/mediator.
+  // Uses a SECURITY DEFINER RPC so RLS doesn't block cross-user reads.
+  async getUpiIdByPhone(phone: string): Promise<string> {
+    const cleaned = phone.replace(/\D/g, '').slice(-10);
+    if (!cleaned) return '';
+    const { data, error } = await supabase.rpc('get_upi_id_by_phone', { p_phone: cleaned });
+    if (error || data == null) return '';
+    return data as string;
   },
 };

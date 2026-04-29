@@ -11,13 +11,14 @@ interface TopbarProps { title: string; }
 
 export function Topbar({ title }: TopbarProps) {
   const { importFile, exportData } = useApp();
-  const { user, signOut, isAdmin, displayName, adminPhone, updateProfile } = useAuth();
+  const { user, signOut, isAdmin, displayName, adminPhone, updateProfile, profile } = useAuth();
   const { showSuccess, showError } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showProfile, setShowProfile] = useState(false);
   const [nameInput, setNameInput]     = useState('');
   const [phoneInput, setPhoneInput]   = useState('');
+  const [upiInput, setUpiInput]       = useState('');
   const [saving, setSaving]           = useState(false);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -36,6 +37,7 @@ export function Topbar({ title }: TopbarProps) {
   function openProfile() {
     setNameInput((user?.user_metadata?.full_name as string | undefined) ?? '');
     setPhoneInput(adminPhone);
+    setUpiInput(profile?.upiId ?? '');
     setShowProfile(true);
   }
 
@@ -49,6 +51,9 @@ export function Topbar({ title }: TopbarProps) {
       loansService.fillBlankLenderPhone(phoneInput.trim()).catch(console.warn);
     } else if (user) {
       profilesService.updateDisplayName(user.id, nameInput.trim()).catch(console.warn);
+    }
+    if (user) {
+      profilesService.updateProfile(user.id, { upiId: upiInput.trim() }).catch(console.warn);
     }
     setSaving(false);
     showSuccess('Profile updated');
@@ -158,6 +163,18 @@ export function Topbar({ title }: TopbarProps) {
                     <p className="text-xs text-slate-400 mt-1">Used to match loans where you are the lender</p>
                   </div>
                 )}
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">UPI ID</label>
+                  <input
+                    type="text"
+                    value={upiInput}
+                    onChange={(e) => setUpiInput(e.target.value)}
+                    placeholder="yourname@upi"
+                    className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 placeholder:text-slate-300 transition-all"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Borrowers can pay you directly via any UPI app</p>
+                </div>
 
                 <div className="bg-slate-50 rounded-xl px-3.5 py-2.5">
                   <p className="text-[11px] font-medium text-slate-400 mb-0.5">Account</p>

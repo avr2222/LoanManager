@@ -148,6 +148,26 @@ export function MediatorDashboardPage() {
     return payments.filter((p) => allMyLoanIds.has(p.loanId));
   }, [payments, allMyLoanIds, isAdmin, isViewAs]);
 
+  const overduePayments = useMemo(() =>
+    myPayments
+      .filter((p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived')
+      .sort((a, b) => b.daysOverdue - a.daysOverdue),
+    [myPayments]
+  );
+
+  const upcomingPayments = useMemo(() => {
+    const today = new Date();
+    const in45  = new Date(today.getTime() + 45 * 24 * 60 * 60 * 1000);
+    return myPayments
+      .filter((p) => {
+        if (p.paymentStatus === 'Received' || p.paymentStatus === 'Waived') return false;
+        if (p.daysOverdue > 0) return false;
+        const due = new Date(p.dueDate);
+        return due >= today && due <= in45;
+      })
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [myPayments]);
+
   // KPI amounts — Active loans only
   const activeBorrower = borrowerLoans.filter((l) => l.loanStatus === 'Active');
   const activeMediator = mediatorLoans.filter((l) => l.loanStatus === 'Active');
@@ -412,6 +432,148 @@ export function MediatorDashboardPage() {
               )}
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── Overdue Payments ── */}
+      {overduePayments.length > 0 && (
+        <div className="bg-white rounded-2xl border border-red-100 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-red-100 flex items-center justify-between"
+            style={{ background: 'linear-gradient(135deg, #fef2f2, #fff)' }}>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <p className="text-xs font-semibold text-red-700 uppercase tracking-widest">Overdue Payments</p>
+            </div>
+            <span className="text-xs font-bold text-white bg-red-500 px-2 py-0.5 rounded-full">
+              {overduePayments.length}
+            </span>
+          </div>
+
+          {/* Mobile */}
+          <div className="md:hidden divide-y divide-slate-50">
+            {overduePayments.map((p) => (
+              <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</p>
+                  <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
+                  <p className="text-xs text-red-500 font-semibold mt-0.5">{p.daysOverdue} days overdue · Due {p.dueDate}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasFullAccess && lenderLoanIds.has(p.loanId) && (
+                    <button onClick={() => handleMarkReceived(p.id)}
+                      className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-2.5 py-1.5 rounded-lg transition-all shadow-sm">
+                      <CheckCircle2 size={13} />
+                    </button>
+                  )}
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-red-600">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{p.monthYear}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop */}
+          <table className="hidden md:table min-w-full">
+            <thead>
+              <tr className="border-b border-red-50">
+                {['Loan', 'Borrower', 'Month', 'Due Date', 'Overdue', 'Amount', ''].map((h) => (
+                  <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {overduePayments.map((p) => (
+                <tr key={p.id} className="border-t border-red-50 hover:bg-red-50/30">
+                  <td className="px-5 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
+                  <td className="px-5 py-3 text-sm font-medium text-slate-800">{p.borrowerName}</td>
+                  <td className="px-5 py-3 text-sm text-slate-600">{p.monthYear}</td>
+                  <td className="px-5 py-3 text-sm text-slate-500">{p.dueDate}</td>
+                  <td className="px-5 py-3">
+                    <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{p.daysOverdue}d late</span>
+                  </td>
+                  <td className="px-5 py-3 text-sm font-semibold text-red-600">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</td>
+                  <td className="px-5 py-3">
+                    {hasFullAccess && lenderLoanIds.has(p.loanId) && (
+                      <button onClick={() => handleMarkReceived(p.id)}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
+                        <CheckCircle2 size={13} /> Mark Received
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── Upcoming Payments ── */}
+      {upcomingPayments.length > 0 && (
+        <div className="bg-white rounded-2xl border border-amber-100 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-amber-100 flex items-center justify-between"
+            style={{ background: 'linear-gradient(135deg, #fffbeb, #fff)' }}>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">Upcoming Payments</p>
+            </div>
+            <span className="text-xs font-bold text-white bg-amber-500 px-2 py-0.5 rounded-full">
+              {upcomingPayments.length}
+            </span>
+          </div>
+
+          {/* Mobile */}
+          <div className="md:hidden divide-y divide-slate-50">
+            {upcomingPayments.map((p) => (
+              <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</p>
+                  <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
+                  <p className="text-xs text-amber-600 mt-0.5">Due {p.dueDate} · {p.monthYear}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasFullAccess && lenderLoanIds.has(p.loanId) && (
+                    <button onClick={() => handleMarkReceived(p.id)}
+                      className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-2.5 py-1.5 rounded-lg transition-all shadow-sm">
+                      <CheckCircle2 size={13} />
+                    </button>
+                  )}
+                  <p className="text-sm font-semibold text-slate-800">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop */}
+          <table className="hidden md:table min-w-full">
+            <thead>
+              <tr className="border-b border-amber-50">
+                {['Loan', 'Borrower', 'Month', 'Due Date', 'Amount', ''].map((h) => (
+                  <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {upcomingPayments.map((p) => (
+                <tr key={p.id} className="border-t border-amber-50 hover:bg-amber-50/30">
+                  <td className="px-5 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
+                  <td className="px-5 py-3 text-sm font-medium text-slate-800">{p.borrowerName}</td>
+                  <td className="px-5 py-3 text-sm text-slate-600">{p.monthYear}</td>
+                  <td className="px-5 py-3 text-sm text-slate-500">{p.dueDate}</td>
+                  <td className="px-5 py-3 text-sm font-semibold text-slate-800">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</td>
+                  <td className="px-5 py-3">
+                    {hasFullAccess && lenderLoanIds.has(p.loanId) && (
+                      <button onClick={() => handleMarkReceived(p.id)}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
+                        <CheckCircle2 size={13} /> Mark Received
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -758,88 +920,6 @@ export function MediatorDashboardPage() {
         </div>
       )}
 
-      {/* ── Payment history ── */}
-      {myPayments.length > 0 && (() => {
-        const pendingFirst = (s: string) => (s === 'Received' || s === 'Waived' ? 1 : 0);
-        const sorted = [...myPayments]
-          .sort((a, b) => {
-            const statusDiff = pendingFirst(a.paymentStatus) - pendingFirst(b.paymentStatus);
-            if (statusDiff !== 0) return statusDiff;
-            return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
-          })
-          .slice(0, 30);
-        return (
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-50">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Payment History</p>
-            </div>
-
-            {/* Mobile */}
-            <div className="md:hidden divide-y divide-slate-50">
-              {sorted.map((p) => (
-                <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</p>
-                    <p className="text-sm text-slate-700">{p.borrowerName} · {p.monthYear}</p>
-                    <p className="text-xs text-slate-400">Due {formatDate(p.dueDate)}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {hasFullAccess && lenderLoanIds.has(p.loanId) && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && (
-                      <button onClick={() => handleMarkReceived(p.id)}
-                        className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-2.5 py-1.5 rounded-lg transition-all shadow-sm">
-                        <CheckCircle2 size={13} />
-                      </button>
-                    )}
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-slate-800">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</p>
-                      <div className="flex items-center gap-1.5 justify-end mt-0.5">
-                        <StatusBadge status={p.paymentStatus} label={borrowerLoanIds.has(p.loanId) && p.paymentStatus === 'Received' ? 'Paid' : undefined} />
-                        {p.daysOverdue > 0 && <span className="text-xs text-red-500">{p.daysOverdue}d</span>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop table */}
-            <table className="hidden md:table min-w-full">
-              <thead>
-                <tr className="border-b border-slate-50">
-                  {['Loan', 'Borrower', 'Month', 'Due Date', 'Amount', 'Status', ''].map((h) => (
-                    <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((p) => (
-                  <tr key={p.id} className="border-t border-slate-50 hover:bg-slate-50/60">
-                    <td className="px-5 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
-                    <td className="px-5 py-3 text-sm text-slate-700">{p.borrowerName}</td>
-                    <td className="px-5 py-3 text-sm text-slate-600">{p.monthYear}</td>
-                    <td className="px-5 py-3 text-sm text-slate-500">{formatDate(p.dueDate)}</td>
-                    <td className="px-5 py-3 text-sm font-semibold text-slate-800">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <StatusBadge status={p.paymentStatus} label={borrowerLoanIds.has(p.loanId) && p.paymentStatus === 'Received' ? 'Paid' : undefined} />
-                        {p.daysOverdue > 0 && <span className="text-xs text-red-500">{p.daysOverdue}d overdue</span>}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3">
-                      {hasFullAccess && lenderLoanIds.has(p.loanId) && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && (
-                        <button onClick={() => handleMarkReceived(p.id)}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
-                          <CheckCircle2 size={13} /> Mark Received
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-      })()}
 
       {!hasBorrower && !hasMediator && !hasLender && (
         <div className="bg-white rounded-2xl border border-slate-100 flex flex-col items-center justify-center py-16 gap-3">

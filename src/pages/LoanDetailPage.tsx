@@ -11,8 +11,9 @@ import {
   type PartyConfirmation,
   type ConfirmationStatus,
 } from '@/services/confirmationsService';
+import { profilesService } from '@/services/profilesService';
 import { formatCurrency, ordinal } from '@/utils/formatUtils';
-import { ChevronLeft, CheckCircle, XCircle, Clock, Edit2, MessageSquare } from 'lucide-react';
+import { ChevronLeft, CheckCircle, XCircle, Clock, Edit2, MessageSquare, Smartphone } from 'lucide-react';
 import type { Loan } from '@/types';
 
 const STATUS_CONFIG: Record<ConfirmationStatus, { icon: React.ReactNode; color: string; label: string }> = {
@@ -110,6 +111,8 @@ export function LoanDetailPage() {
   const [editing, setEditing] = useState(false);
   const [disputingId, setDisputingId] = useState<string | null>(null);
   const [offlineConfirmId, setOfflineConfirmId] = useState<string | null>(null);
+  const [payUpiId, setPayUpiId] = useState('');
+  const [payUpiName, setPayUpiName] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -119,6 +122,21 @@ export function LoanDetailPage() {
       setLoadingConf(false);
     });
   }, [id]);
+
+  // Fetch lender/mediator UPI for the "Pay via UPI" button
+  useEffect(() => {
+    if (!loan) return;
+    const payPhone = loan.loanType === 'Through Mediator'
+      ? (loan.mediatorPhone ?? '')
+      : (loan.lenderPhone ?? '');
+    const payName = loan.loanType === 'Through Mediator'
+      ? (loan.mediatorName ?? '')
+      : (loan.lenderName ?? '');
+    if (!payPhone) return;
+    setPayUpiName(payName);
+    profilesService.getUpiIdByPhone(payPhone).then(setPayUpiId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loan?.loanId]);
 
   if (!loan) {
     return (
@@ -189,7 +207,7 @@ export function LoanDetailPage() {
     : 'Pending';
 
   const canEdit = hasFullAccess && isCreator && overallStatus !== 'All Confirmed';
-  // Resolved outside JSX to avoid IIFE antipattern in render
+  const isBorrower = !!myNormPhone && loan.borrowerPhone?.replace(/\D/g, '').slice(-10) === myNormPhone;
   const offlineConf = confirmations.find((x) => x.id === offlineConfirmId);
 
   return (
@@ -225,6 +243,16 @@ export function LoanDetailPage() {
               >
                 <Edit2 size={12} /> Edit
               </button>
+            )}
+            {isBorrower && payUpiId && loan.loanStatus === 'Active' && (
+              <a
+                href={`upi://pay?pa=${encodeURIComponent(payUpiId)}&pn=${encodeURIComponent(payUpiName)}&am=${loan.monthlyInterestAmount}&cu=INR&tn=Loan+${loan.loanId}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all"
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                title={`Pay ₹${loan.monthlyInterestAmount} to ${payUpiName} (${payUpiId})`}
+              >
+                <Smartphone size={12} /> Pay via UPI
+              </a>
             )}
           </div>
         </div>
