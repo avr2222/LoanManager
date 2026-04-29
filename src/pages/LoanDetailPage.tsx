@@ -230,8 +230,8 @@ export function LoanDetailPage() {
   }
 
   function handleOpenUpiApp() {
-    const amount  = targetPayment?.netAmountExpected ?? loan.monthlyInterestAmount;
-    const note    = `Loan ${loan.loanId}${targetPayment ? ' ' + targetPayment.monthYear : ''}`;
+    const amount  = targetPayment?.netAmountExpected ?? loan!.monthlyInterestAmount;
+    const note    = `Loan ${loan!.loanId}${targetPayment ? ' ' + targetPayment.monthYear : ''}`;
     window.location.href = `upi://pay?pa=${encodeURIComponent(payUpiId)}&pn=${encodeURIComponent(payUpiName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
     setTimeout(() => setUpiStep('confirm'), 1500);
   }
