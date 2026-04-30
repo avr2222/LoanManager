@@ -260,7 +260,9 @@ export const paymentsService = {
 
   async bulkUpsert(payments: Payment[]): Promise<void> {
     if (payments.length === 0) return;
-    const { error } = await supabase.from('payments').upsert(payments.map(toDbPayment));
+    const { error } = await supabase
+      .from('payments')
+      .upsert(payments.map(toDbPayment), { onConflict: 'loan_id,month_year' });
     if (error) throw error;
   },
 
