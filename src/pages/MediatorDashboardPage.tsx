@@ -12,6 +12,8 @@ import { useAuth } from '@/context/AuthContext';
 import { formatCurrency, formatDate, ordinal, formatRateAsRupees } from '@/utils/formatUtils';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { useToast } from '@/components/common/Toast';
+import { WhatsAppButton } from '@/components/common/WhatsAppButton';
+import { overdueMessage, dueMessage } from '@/utils/whatsappUtils';
 import { exportUserPDF } from '@/services/pdfService';
 import { derivePaymentFields } from '@/services/calculationService';
 
@@ -62,7 +64,7 @@ interface BorrowerGroup {
 export function MediatorDashboardPage() {
   const { loans, updateLoan, deleteLoan } = useLoans();
   const { payments, updatePayment, deletePaymentsByLoan } = usePayments();
-  const { userPhone, hasFullAccess, isAdmin } = useAuth();
+  const { userPhone, hasFullAccess, isAdmin, profile } = useAuth();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const [showClosedLoans, setShowClosedLoans]   = useState(false);
@@ -570,6 +572,12 @@ export function MediatorDashboardPage() {
                   <p className="text-xs text-red-500 font-semibold mt-0.5">{p.daysOverdue} days overdue · Due {p.dueDate}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {lenderLoanIds.has(p.loanId) && (
+                    <WhatsAppButton
+                      phone={loans.find(l => l.loanId === p.loanId)?.borrowerPhone ?? ''}
+                      message={overdueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, daysOverdue: p.daysOverdue, upiId: profile?.upiId ?? undefined })}
+                    />
+                  )}
                   {hasFullAccess && lenderLoanIds.has(p.loanId) && (
                     <button onClick={() => handleMarkReceived(p.id)}
                       className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-2.5 py-1.5 rounded-lg transition-all shadow-sm">
@@ -606,12 +614,20 @@ export function MediatorDashboardPage() {
                   </td>
                   <td className="px-5 py-3 text-sm font-semibold text-red-600">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</td>
                   <td className="px-5 py-3">
-                    {hasFullAccess && lenderLoanIds.has(p.loanId) && (
-                      <button onClick={() => handleMarkReceived(p.id)}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
-                        <CheckCircle2 size={13} /> Mark Received
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {lenderLoanIds.has(p.loanId) && (
+                        <WhatsAppButton
+                          phone={loans.find(l => l.loanId === p.loanId)?.borrowerPhone ?? ''}
+                          message={overdueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, daysOverdue: p.daysOverdue, upiId: profile?.upiId ?? undefined })}
+                        />
+                      )}
+                      {hasFullAccess && lenderLoanIds.has(p.loanId) && (
+                        <button onClick={() => handleMarkReceived(p.id)}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
+                          <CheckCircle2 size={13} /> Mark Received
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -644,6 +660,12 @@ export function MediatorDashboardPage() {
                   <p className="text-xs text-amber-600 mt-0.5">Due {p.dueDate} · {p.monthYear}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {lenderLoanIds.has(p.loanId) && (
+                    <WhatsAppButton
+                      phone={loans.find(l => l.loanId === p.loanId)?.borrowerPhone ?? ''}
+                      message={dueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, dueDate: p.dueDate, upiId: profile?.upiId ?? undefined })}
+                    />
+                  )}
                   {hasFullAccess && lenderLoanIds.has(p.loanId) && (
                     <button onClick={() => handleMarkReceived(p.id)}
                       className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-2.5 py-1.5 rounded-lg transition-all shadow-sm">
@@ -674,12 +696,20 @@ export function MediatorDashboardPage() {
                   <td className="px-5 py-3 text-sm text-slate-500">{p.dueDate}</td>
                   <td className="px-5 py-3 text-sm font-semibold text-slate-800">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</td>
                   <td className="px-5 py-3">
-                    {hasFullAccess && lenderLoanIds.has(p.loanId) && (
-                      <button onClick={() => handleMarkReceived(p.id)}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
-                        <CheckCircle2 size={13} /> Mark Received
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {lenderLoanIds.has(p.loanId) && (
+                        <WhatsAppButton
+                          phone={loans.find(l => l.loanId === p.loanId)?.borrowerPhone ?? ''}
+                          message={dueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, dueDate: p.dueDate, upiId: profile?.upiId ?? undefined })}
+                        />
+                      )}
+                      {hasFullAccess && lenderLoanIds.has(p.loanId) && (
+                        <button onClick={() => handleMarkReceived(p.id)}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
+                          <CheckCircle2 size={13} /> Mark Received
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -8,6 +8,8 @@ import { CheckCircle2, Users, X, FileText } from 'lucide-react';
 import { useLoans } from '@/context/LoanContext';
 import { usePayments } from '@/context/PaymentContext';
 import { useAuth } from '@/context/AuthContext';
+import { WhatsAppButton } from '@/components/common/WhatsAppButton';
+import { overdueMessage, dueMessage } from '@/utils/whatsappUtils';
 import { computeKPIs } from '@/services/calculationService';
 import { formatCurrency, formatDate, formatMonthYear } from '@/utils/formatUtils';
 import { KPICard } from '@/components/dashboard/KPICard';
@@ -56,7 +58,7 @@ function BarTooltip({ active, payload, label }: { active?: boolean; payload?: To
 export function DashboardPage() {
   const { loans } = useLoans();
   const { payments } = usePayments();
-  const { displayName } = useAuth();
+  const { displayName, profile } = useAuth();
   const navigate = useNavigate();
   const [viewAsPhone, setViewAsPhone] = useState('');
   const [showUserPicker, setShowUserPicker] = useState(false);
@@ -211,11 +213,17 @@ export function DashboardPage() {
                       <p className="text-sm font-medium text-slate-800 truncate">{p.borrowerName}</p>
                       <p className="text-xs text-slate-400">{p.monthYear} · <span className="text-red-500">{p.daysOverdue}d</span></p>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1">
                       <p className="text-sm font-semibold text-red-500">{formatCurrency(p.pendingAmount)}</p>
-                      <button onClick={() => recordPayment(p.loanId)} className="mt-1.5 flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg">
-                        <CheckCircle2 size={14} /> Record
-                      </button>
+                      <div className="flex gap-1">
+                        <WhatsAppButton
+                          phone={loans.find(l => l.loanId === p.loanId)?.borrowerPhone ?? ''}
+                          message={overdueMessage({ borrowerName: p.borrowerName, amount: p.pendingAmount, monthYear: p.monthYear, daysOverdue: p.daysOverdue, upiId: profile?.upiId ?? undefined })}
+                        />
+                        <button onClick={() => recordPayment(p.loanId)} className="flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg">
+                          <CheckCircle2 size={14} /> Record
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -224,7 +232,7 @@ export function DashboardPage() {
               <table className="hidden md:table min-w-full">
                 <thead>
                   <tr className="border-b border-slate-50">
-                    {['Loan', 'Borrower', 'Month', 'Pending', 'Days'].map((h) => (
+                    {['Loan', 'Borrower', 'Month', 'Pending', 'Days', ''].map((h) => (
                       <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -237,6 +245,12 @@ export function DashboardPage() {
                       <td className="px-5 py-3 text-xs text-slate-500">{p.monthYear}</td>
                       <td className="px-5 py-3 text-sm font-semibold text-red-500">{formatCurrency(p.pendingAmount)}</td>
                       <td className="px-5 py-3"><span className="text-xs font-medium text-red-500 bg-red-50 px-2 py-0.5 rounded-full">{p.daysOverdue}d</span></td>
+                      <td className="px-5 py-3">
+                        <WhatsAppButton
+                          phone={loans.find(l => l.loanId === p.loanId)?.borrowerPhone ?? ''}
+                          message={overdueMessage({ borrowerName: p.borrowerName, amount: p.pendingAmount, monthYear: p.monthYear, daysOverdue: p.daysOverdue, upiId: profile?.upiId ?? undefined })}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -263,11 +277,17 @@ export function DashboardPage() {
                       <p className="text-sm font-medium text-slate-800 truncate">{p.borrowerName}</p>
                       <p className="text-xs text-slate-400">Due {formatDate(p.dueDate)}</p>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1">
                       <p className="text-sm font-semibold text-slate-800">{formatCurrency(p.netAmountExpected)}</p>
-                      <button onClick={() => recordPayment(p.loanId)} className="mt-1.5 flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg">
-                        <CheckCircle2 size={14} /> Record
-                      </button>
+                      <div className="flex gap-1">
+                        <WhatsAppButton
+                          phone={loans.find(l => l.loanId === p.loanId)?.borrowerPhone ?? ''}
+                          message={dueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, dueDate: p.dueDate, upiId: profile?.upiId ?? undefined })}
+                        />
+                        <button onClick={() => recordPayment(p.loanId)} className="flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg">
+                          <CheckCircle2 size={14} /> Record
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -276,7 +296,7 @@ export function DashboardPage() {
               <table className="hidden md:table min-w-full">
                 <thead>
                   <tr className="border-b border-slate-50">
-                    {['Loan', 'Borrower', 'Due Date', 'Amount', 'Status'].map((h) => (
+                    {['Loan', 'Borrower', 'Due Date', 'Amount', 'Status', ''].map((h) => (
                       <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -289,6 +309,12 @@ export function DashboardPage() {
                       <td className="px-5 py-3 text-xs text-slate-500">{formatDate(p.dueDate)}</td>
                       <td className="px-5 py-3 text-sm font-semibold text-slate-800">{formatCurrency(p.netAmountExpected)}</td>
                       <td className="px-5 py-3"><StatusBadge status={p.paymentStatus} /></td>
+                      <td className="px-5 py-3">
+                        <WhatsAppButton
+                          phone={loans.find(l => l.loanId === p.loanId)?.borrowerPhone ?? ''}
+                          message={dueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, dueDate: p.dueDate, upiId: profile?.upiId ?? undefined })}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>

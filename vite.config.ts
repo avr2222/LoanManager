@@ -53,6 +53,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/LoanManager/index.html',
         navigateFallbackDenylist: [/^\/LoanManager\/api/],
+        importScripts: ['/LoanManager/push-handler.js'],
       },
       devOptions: {
         enabled: false,

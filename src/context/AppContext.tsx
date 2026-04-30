@@ -3,6 +3,7 @@ import { loansService, paymentsService } from '@/services/supabaseService';
 import { importFromExcel, exportToExcel } from '@/services/excelService';
 import { profilesService } from '@/services/profilesService';
 import { generateMonthlyPayment } from '@/services/calculationService';
+import { initPushNotifications } from '@/services/pushNotificationService';
 import { useLoans } from './LoanContext';
 import { usePayments } from './PaymentContext';
 import { useAuth } from './AuthContext';
@@ -68,6 +69,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { user, isAdmin, displayName, adminPhone } = useAuth();
   const { loans, bulkLoadLoans } = useLoans();
   const { payments, bulkLoadPayments } = usePayments();
+
+  // Init push notifications once user is known
+  useEffect(() => {
+    if (user?.id) initPushNotifications(user.id).catch(console.warn);
+  }, [user?.id]);
 
   // Load all data from Supabase when user is authenticated
   useEffect(() => {
