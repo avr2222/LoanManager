@@ -9,9 +9,10 @@ function normalizePhone(phone?: string | null): string {
   return phone.replace(/\D/g, '').slice(-10);
 }
 
-function toDbLoan(l: Loan): Record<string, unknown> {
+function toDbLoan(l: Loan, fallbackCreatorId?: string): Record<string, unknown> {
   return {
     loan_id: l.loanId,
+    creator_id: l.creatorId ?? fallbackCreatorId,   // always set — required by RLS
     lender_name: l.lenderName ?? '',
     lender_phone: normalizePhone(l.lenderPhone),
     borrower_name: l.borrowerName,
@@ -152,13 +153,16 @@ export const loansService = {
   },
 
   async upsert(loan: Loan): Promise<void> {
-    const { error } = await supabase.from('loans').upsert(toDbLoan(loan));
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('loans').upsert(toDbLoan(loan, user?.id));
     if (error) throw error;
   },
 
   async bulkUpsert(loans: Loan[]): Promise<void> {
     if (loans.length === 0) return;
-    const { error } = await supabase.from('loans').upsert(loans.map(toDbLoan));
+    const { data: { user } } = await supabase.auth.getUser();
+    const uid = user?.id;
+    const { error } = await supabase.from('loans').upsert(loans.map((l) => toDbLoan(l, uid)));
     if (error) throw error;
   },
 
