@@ -153,15 +153,15 @@ export const loansService = {
   },
 
   async upsert(loan: Loan): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('loans').upsert(toDbLoan(loan, user?.id));
+    const { data: { session } } = await supabase.auth.getSession();
+    const { error } = await supabase.from('loans').upsert(toDbLoan(loan, session?.user.id));
     if (error) throw error;
   },
 
   async bulkUpsert(loans: Loan[]): Promise<void> {
     if (loans.length === 0) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    const uid = user?.id;
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user.id;
     const { error } = await supabase.from('loans').upsert(loans.map((l) => toDbLoan(l, uid)));
     if (error) throw error;
   },

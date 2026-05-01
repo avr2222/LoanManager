@@ -3,6 +3,7 @@ import type { Loan } from '@/types';
 import { loansService } from '@/services/supabaseService';
 import { deriveLoanFields } from '@/services/calculationService';
 import { profilesService } from '@/services/profilesService';
+import { useAuth } from './AuthContext';
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
@@ -50,17 +51,18 @@ const LoanContext = createContext<LoanContextValue | null>(null);
 
 export function LoanProvider({ children }: { children: ReactNode }) {
   const [loans, dispatch] = useReducer(loanReducer, []);
+  const { user } = useAuth();
 
   const addLoan = useCallback(async (loan: Loan): Promise<Loan> => {
     // Always get the next ID from the server — phone users can't see all loans
     // via RLS so client-side generateLoanId() can produce a colliding ID.
     const loanId = await loansService.getNextLoanId();
-    const finalLoan = { ...loan, loanId };
+    const finalLoan = { ...loan, loanId, creatorId: loan.creatorId ?? user?.id };
     await loansService.upsert(finalLoan);
     profilesService.provisionFromLoans([finalLoan]).catch(console.warn);
     dispatch({ type: 'ADD', payload: finalLoan });
     return finalLoan;
-  }, []);
+  }, [user?.id]);
 
   const updateLoan = useCallback(async (loan: Loan) => {
     const updated = deriveLoanFields({ ...loan, updatedAt: undefined as unknown as string } as Parameters<typeof deriveLoanFields>[0]);
