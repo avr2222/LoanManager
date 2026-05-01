@@ -58,7 +58,9 @@ export function LoanProvider({ children }: { children: ReactNode }) {
     // via RLS so client-side generateLoanId() can produce a colliding ID.
     const loanId = await loansService.getNextLoanId();
     const finalLoan = { ...loan, loanId, creatorId: loan.creatorId ?? user?.id };
-    await loansService.upsert(finalLoan);
+    // Use insert (not upsert) — new loans must never hit ON CONFLICT UPDATE,
+    // which fails RLS when stale rows with creator_id=NULL exist in the DB.
+    await loansService.insert(finalLoan);
     profilesService.provisionFromLoans([finalLoan]).catch(console.warn);
     dispatch({ type: 'ADD', payload: finalLoan });
     return finalLoan;

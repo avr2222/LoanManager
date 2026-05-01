@@ -152,10 +152,23 @@ export const loansService = {
     return (data ?? []).map((r) => fromDbLoan(r as Record<string, unknown>));
   },
 
+  /** INSERT a brand-new loan. Never uses upsert — avoids ON CONFLICT UPDATE path
+   *  which fails if a stale row with creator_id=NULL already exists in DB. */
+  async insert(loan: Loan): Promise<void> {
+    // getUser() validates the JWT server-side — more reliable than getSession()
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated — please log in again.');
+    const row = toDbLoan(loan, user.id);
+    console.log('[insert] creator_id=', row.creator_id, ' user.id=', user.id);
+    const { error } = await supabase.from('loans').insert(row);
+    if (error) throw error;
+  },
+
+  /** UPDATE an existing loan (edit form, status change). Preserves creator_id. */
   async upsert(loan: Loan): Promise<void> {
-    const { data: { session } } = await supabase.auth.getSession();
-    const row = toDbLoan(loan, session?.user.id);
-    console.log('[upsert] creator_id=', row.creator_id, ' auth session uid=', session?.user.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    const row = toDbLoan(loan, user?.id);
+    console.log('[upsert] creator_id=', row.creator_id, ' user.id=', user?.id);
     const { error } = await supabase.from('loans').upsert(row);
     if (error) throw error;
   },
