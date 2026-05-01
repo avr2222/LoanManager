@@ -154,7 +154,9 @@ export const loansService = {
 
   async upsert(loan: Loan): Promise<void> {
     const { data: { session } } = await supabase.auth.getSession();
-    const { error } = await supabase.from('loans').upsert(toDbLoan(loan, session?.user.id));
+    const row = toDbLoan(loan, session?.user.id);
+    console.log('[upsert] creator_id=', row.creator_id, ' auth session uid=', session?.user.id);
+    const { error } = await supabase.from('loans').upsert(row);
     if (error) throw error;
   },
 
