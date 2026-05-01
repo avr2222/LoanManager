@@ -77,7 +77,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Load all data from Supabase when user is authenticated
   useEffect(() => {
-    if (!user) {
+    if (!user?.id) {
       setLoading(false);
       return;
     }
@@ -145,7 +145,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .catch(console.error)
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user?.id]); // user?.id — not user — so token refresh doesn't re-trigger a full reload
 
   const importFile = useCallback(async (file: File) => {
     const result = await importFromExcel(file);
