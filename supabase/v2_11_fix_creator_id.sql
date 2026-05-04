@@ -1,12 +1,15 @@
 -- ============================================================
 -- V2 Migration 11 — Fix creator_id on loans
 -- Combines:
---   1. Trigger: auto-set creator_id = auth.uid() on INSERT
+--   1. Trigger: force creator_id = auth.uid() on every INSERT
 --   2. Backfill: set existing NULL rows to the super-admin user
 -- Safe to re-run.
 -- ============================================================
 
--- ── 1. Trigger: always set creator_id on INSERT if not provided ───────────────
+-- ── 1. Trigger: always force creator_id = auth.uid() on INSERT ────────────────
+--    Unconditional — even if the app sends a value, the DB
+--    always stamps the real authenticated user.  This means
+--    WITH CHECK (creator_id = auth.uid()) can never fail.
 CREATE OR REPLACE FUNCTION public.set_loan_creator_id()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -14,9 +17,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF NEW.creator_id IS NULL THEN
-    NEW.creator_id := auth.uid();
-  END IF;
+  NEW.creator_id := auth.uid();
   RETURN NEW;
 END;
 $$;
@@ -36,3 +37,10 @@ SET creator_id = (
   LIMIT 1
 )
 WHERE creator_id IS NULL;
+
+
+-- ── 3. Verify ─────────────────────────────────────────────────────────────────
+SELECT
+  COUNT(*)                                    AS total_loans,
+  COUNT(*) FILTER (WHERE creator_id IS NULL)  AS still_null
+FROM public.loans;
