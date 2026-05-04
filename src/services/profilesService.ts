@@ -1,4 +1,5 @@
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import { supabase, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 import type { Loan } from '@/types';
 
 export interface Profile {
@@ -95,35 +96,36 @@ export const profilesService = {
   },
 
   // Auto-provision phone accounts from loan data.
-  // Called after import or when a loan is added.
-  // Password defaults to the phone number itself.
-  // Silently skips if account already exists.
-  // One account per phone number regardless of role (borrower, mediator, or both).
-  // Email format: phone@user.local, default password = phone number.
+  // Uses a disposable Supabase client (persistSession: false) so signUp/signIn
+  // never overwrites the currently logged-in admin's session.
   async provisionFromLoans(loans: Loan[]): Promise<void> {
     const phones = new Set<string>();
-
     for (const loan of loans) {
       const bp = loan.borrowerPhone?.replace(/\D/g, '').slice(-10);
       if (bp && bp.length >= 10) phones.add(bp);
-
       if (loan.loanType === 'Through Mediator') {
         const mp = loan.mediatorPhone?.replace(/\D/g, '').slice(-10);
         if (mp && mp.length >= 10) phones.add(mp);
       }
     }
+    if (phones.size === 0) return;
 
-    for (const phone of phones) {
-      const email = `${phone}@user.local`;
-      // Only provision if the account doesn't exist yet.
-      // DO NOT call signUp for existing accounts — Supabase (with email confirmation
-      // disabled) resets the password, which would wipe any custom password the user set.
-      const { error } = await supabase.auth.signInWithPassword({ email, password: phone });
-      if (!error) continue; // already exists and has default password — skip
-      // If sign-in failed with anything other than "invalid credentials", skip too
-      // Only provision if truly new (we can't distinguish "wrong password" from "no account"
-      // via the error message, so we attempt signUp but accept the error either way)
-      await supabase.auth.signUp({ email, password: phone });
+    // Check which phones already have profiles — avoids any auth call for existing users
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('phone')
+      .in('phone', [...phones]);
+    const existingSet = new Set((existing ?? []).map((r) => (r as { phone: string }).phone));
+    const newPhones = [...phones].filter((p) => !existingSet.has(p));
+    if (newPhones.length === 0) return;
+
+    // Disposable client — auth calls on this instance never update localStorage
+    // or fire onAuthStateChange on the main client, so the admin stays logged in.
+    const guest = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    for (const phone of newPhones) {
+      await guest.auth.signUp({ email: `${phone}@user.local`, password: phone });
     }
   },
 
