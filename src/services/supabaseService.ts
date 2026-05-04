@@ -180,12 +180,9 @@ export const loansService = {
     if (error) throw error;
   },
 
-  /** Soft-delete — sets deleted_at; trigger sets deleted_by automatically */
+  /** Soft-delete via SECURITY DEFINER RPC — bypasses RLS (same pattern as insert). */
   async delete(loanId: string): Promise<void> {
-    const { error } = await supabase
-      .from('loans')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('loan_id', loanId);
+    const { error } = await supabase.rpc('soft_delete_loan', { p_loan_id: loanId });
     if (error) throw error;
   },
 
