@@ -152,15 +152,14 @@ export const loansService = {
     return (data ?? []).map((r) => fromDbLoan(r as Record<string, unknown>));
   },
 
-  /** INSERT a brand-new loan. Never uses upsert — avoids ON CONFLICT UPDATE path
-   *  which fails if a stale row with creator_id=NULL already exists in DB. */
+  /** INSERT a brand-new loan via SECURITY DEFINER RPC — bypasses RLS entirely.
+   *  The function runs as postgres superuser and stamps creator_id = auth.uid()
+   *  server-side, so non-admin phone users are never blocked by RLS policies. */
   async insert(loan: Loan): Promise<void> {
-    // getUser() validates the JWT server-side — more reliable than getSession()
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated — please log in again.');
     const row = toDbLoan(loan, user.id);
-    console.log('[insert] creator_id=', row.creator_id, ' user.id=', user.id);
-    const { error } = await supabase.from('loans').insert(row);
+    const { error } = await supabase.rpc('create_loan', { p_loan: row });
     if (error) throw error;
   },
 
