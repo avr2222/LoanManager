@@ -57,7 +57,7 @@ export function ForgotPasswordModal({ phone: initialPhone, onClose, onSuccess }:
   }
 
   async function handlePasswordReset() {
-    if (newPassword.length < 6) { setError('Password must be at least 6 characters'); return; }
+    if (newPassword.length < 8) { setError('Password must be at least 8 characters'); return; }
     if (newPassword !== confirmPassword) { setError('Passwords do not match'); return; }
     setError('');
     setLoading(true);
@@ -179,7 +179,7 @@ export function ForgotPasswordModal({ phone: initialPhone, onClose, onSuccess }:
                     type={showNew ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => { setNewPassword(e.target.value); setError(''); }}
-                    placeholder="New password (min 6 chars)"
+                    placeholder="New password (min 8 chars)"
                     className="w-full px-3.5 py-2.5 pr-10 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400"
                     autoFocus
                   />

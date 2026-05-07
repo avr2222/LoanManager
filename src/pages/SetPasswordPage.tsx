@@ -27,7 +27,7 @@ export function SetPasswordPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 6)         { setError('Password must be at least 6 characters'); return; }
+    if (password.length < 8)         { setError('Password must be at least 8 characters'); return; }
     if (password !== confirm)        { setError('Passwords do not match'); return; }
     if (!answer.trim())              { setError('Enter your security answer'); return; }
 
@@ -69,7 +69,7 @@ export function SetPasswordPage() {
                   type={showPass ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                  placeholder="Minimum 6 characters"
+                  placeholder="Minimum 8 characters"
                   className="w-full px-3.5 py-2.5 pr-10 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   autoFocus
                 />

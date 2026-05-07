@@ -118,6 +118,7 @@ export function LoanDetailPage() {
   const [upiStep, setUpiStep] = useState<'initiate' | 'confirm'>('initiate');
   const [utrInput, setUtrInput] = useState('');
   const [claiming, setClaiming] = useState(false);
+  const [showAllPayments, setShowAllPayments] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -232,8 +233,8 @@ export function LoanDetailPage() {
   function handleOpenUpiApp() {
     const amount  = targetPayment?.netAmountExpected ?? loan!.monthlyInterestAmount;
     const note    = `Loan ${loan!.loanId}${targetPayment ? ' ' + targetPayment.monthYear : ''}`;
-    window.location.href = `upi://pay?pa=${encodeURIComponent(payUpiId)}&pn=${encodeURIComponent(payUpiName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
-    setTimeout(() => setUpiStep('confirm'), 1500);
+    window.open(`upi://pay?pa=${encodeURIComponent(payUpiId)}&pn=${encodeURIComponent(payUpiName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`, '_blank');
+    setUpiStep('confirm');
   }
 
   async function handleClaimPayment() {
@@ -415,7 +416,7 @@ export function LoanDetailPage() {
         <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Payment History</h3>
           <div className="space-y-2">
-            {loanPayments.slice(0, 12).map((p) => (
+            {(showAllPayments ? loanPayments : loanPayments.slice(0, 12)).map((p) => (
               <div key={p.id} className="flex items-center justify-between text-xs py-2 border-b border-slate-50 last:border-0">
                 <div>
                   <span className="font-medium text-slate-700">{p.monthYear}</span>
@@ -435,6 +436,14 @@ export function LoanDetailPage() {
               </div>
             ))}
           </div>
+          {loanPayments.length > 12 && (
+            <button
+              onClick={() => setShowAllPayments(v => !v)}
+              className="mt-3 w-full text-xs text-indigo-500 hover:text-indigo-700 font-medium py-1.5 border border-indigo-100 rounded-xl hover:bg-indigo-50 transition-colors"
+            >
+              {showAllPayments ? 'Show less' : `Show all ${loanPayments.length} payments`}
+            </button>
+          )}
         </div>
       )}
 

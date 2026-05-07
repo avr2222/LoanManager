@@ -1,14 +1,15 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, CreditCard, BarChart3, Upload } from 'lucide-react';
+import { LayoutDashboard, CreditCard, BarChart3, Upload, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 const commonNav = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/loans',     icon: CreditCard,      label: 'Loans' },
   { to: '/payments',  icon: BarChart3,        label: 'Payments' },
 ];
 
 const adminOnlyNav = [
+  { to: '/users',  icon: Users,  label: 'Users' },
   { to: '/import', icon: Upload, label: 'Import' },
 ];
 
@@ -18,7 +19,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/90 backdrop-blur-md border-t border-slate-200/60 md:hidden shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
-      <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'}`}>
+      <div className={`grid ${isAdmin ? 'grid-cols-5' : 'grid-cols-3'}`}>
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

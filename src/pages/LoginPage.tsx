@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { HandCoins, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
 
 export function LoginPage() {
   const { signIn, signInWithPhone, user } = useAuth();
@@ -13,6 +14,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError]               = useState('');
   const [loading, setLoading]           = useState(false);
+  const [showForgot, setShowForgot]     = useState(false);
 
   useEffect(() => {
     const pre = searchParams.get('email');
@@ -43,6 +45,7 @@ export function LoginPage() {
   }
 
   return (
+    <>
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
       style={{ background: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99,102,241,0.08) 0%, transparent 70%), #f8fafc' }}>
 
@@ -86,9 +89,18 @@ export function LoginPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgot(true)}
+                  className="text-xs text-indigo-500 hover:text-indigo-700 font-medium transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -145,5 +157,14 @@ export function LoginPage() {
 
       </div>
     </div>
+
+    {showForgot && (
+      <ForgotPasswordModal
+        phone={(() => { const c = email.replace(/\D/g, ''); return c.length === 10 ? c : ''; })()}
+        onClose={() => setShowForgot(false)}
+        onSuccess={() => setShowForgot(false)}
+      />
+    )}
+    </>
   );
 }
