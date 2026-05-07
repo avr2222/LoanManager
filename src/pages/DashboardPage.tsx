@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  ComposedChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, Line,
 } from 'recharts';
 import { CheckCircle2, Users, X, FileText } from 'lucide-react';
 import { useLoans } from '@/context/LoanContext';
@@ -65,9 +65,9 @@ export function DashboardPage() {
   const kpis = useMemo(() => computeKPIs(loans, payments), [loans, payments]);
 
   const statusData = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const l of loans) counts[l.loanStatus] = (counts[l.loanStatus] ?? 0) + 1;
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+    const sums: Record<string, number> = {};
+    for (const l of loans) sums[l.loanStatus] = (sums[l.loanStatus] ?? 0) + l.principalAmount;
+    return Object.entries(sums).map(([name, value]) => ({ name, value }));
   }, [loans]);
 
   const monthlyData = useMemo(() => {
@@ -76,12 +76,24 @@ export function DashboardPage() {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
       const label = formatMonthYear(d);
       const mp = payments.filter((p) => p.monthYear === label);
+      const exp = Math.round(mp.reduce((s, p) => s + p.netAmountExpected, 0));
+      const rec = Math.round(mp.reduce((s, p) => s + p.amountReceived, 0));
       return {
-        month: label.split('-')[0], // "Apr" only — shorter on chart
-        Expected: Math.round(mp.reduce((s, p) => s + p.netAmountExpected, 0)),
-        Received: Math.round(mp.reduce((s, p) => s + p.amountReceived, 0)),
+        month: label.split('-')[0],
+        Expected: exp,
+        Received: rec,
+        Rate: exp > 0 ? Math.round((rec / exp) * 100) : 0,
       };
     });
+  }, [payments]);
+
+  const thisMonthStats = useMemo(() => {
+    const label = formatMonthYear(new Date());
+    const mp = payments.filter((p) => p.monthYear === label);
+    const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
+    const collected = mp.reduce((s, p) => s + p.amountReceived, 0);
+    const rate = expected > 0 ? Math.round((collected / expected) * 100) : 0;
+    return { label, expected, collected, rate, pending: Math.max(0, expected - collected) };
   }, [payments]);
 
   const overduePayments = useMemo(() =>
@@ -158,24 +170,64 @@ export function DashboardPage() {
         <KPICard title="Borrowers"     value={String(loans.length)} />
       </div>
 
+      {/* This Month Collection */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+            {thisMonthStats.label} — Collection Progress
+          </p>
+          <span className={`text-sm font-bold ${
+            thisMonthStats.rate >= 90 ? 'text-emerald-500' :
+            thisMonthStats.rate >= 60 ? 'text-amber-500' : 'text-red-500'
+          }`}>{thisMonthStats.rate}%</span>
+        </div>
+        <div className="w-full bg-slate-100 rounded-full h-2.5 mb-4">
+          <div
+            className={`h-2.5 rounded-full transition-all duration-500 ${
+              thisMonthStats.rate >= 90 ? 'bg-emerald-500' :
+              thisMonthStats.rate >= 60 ? 'bg-amber-400' : 'bg-indigo-500'
+            }`}
+            style={{ width: `${Math.min(100, thisMonthStats.rate)}%` }}
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <p className="text-xs text-slate-400 mb-1">Expected</p>
+            <p className="text-base font-bold text-slate-700">{formatCurrency(thisMonthStats.expected)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 mb-1">Collected</p>
+            <p className="text-base font-bold text-emerald-600">{formatCurrency(thisMonthStats.collected)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 mb-1">Pending</p>
+            <p className={`text-base font-bold ${thisMonthStats.pending > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+              {formatCurrency(thisMonthStats.pending)}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 p-5">
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Monthly Income — Last 6 Months</p>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={monthlyData} barGap={3} barCategoryGap="30%">
+            <ComposedChart data={monthlyData} barGap={3} barCategoryGap="30%">
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} width={38} />
+              <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} width={38} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} domain={[0, 100]} width={36} />
               <Tooltip content={<BarTooltip />} cursor={{ fill: 'rgba(99,102,241,0.04)' }} />
               <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
-              <Bar dataKey="Expected" fill="#e0e7ff" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Received" fill="#6366f1" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Bar yAxisId="left" dataKey="Expected" fill="#e0e7ff" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="left" dataKey="Received" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              <Line yAxisId="right" dataKey="Rate" name="Rate %" type="monotone" stroke="#10b981" strokeWidth={2} dot={{ r: 3, fill: '#10b981' }} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Loan Status</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Portfolio by Principal</p>
           {statusData.length === 0 ? (
             <div className="flex items-center justify-center h-44 text-sm text-slate-400">No data</div>
           ) : (
@@ -185,7 +237,10 @@ export function DashboardPage() {
                   {statusData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} strokeWidth={0} />)}
                 </Pie>
                 <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
-                <Tooltip contentStyle={{ border: 'none', borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value) => [formatCurrency(Number(value)), 'Principal']}
+                  contentStyle={{ border: 'none', borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', fontSize: 12 }}
+                />
               </PieChart>
             </ResponsiveContainer>
           )}
