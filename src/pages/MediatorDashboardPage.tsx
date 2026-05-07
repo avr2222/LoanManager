@@ -208,7 +208,7 @@ export function MediatorDashboardPage() {
     const currentLabel = formatMonthYear(now); // "May-2026" — same format as payment.monthYear
     const mp = myPayments.filter((p) => p.monthYear === currentLabel);
     const monthFull = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-    const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
+const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
     const collected = mp.reduce((s, p) => s + p.amountReceived, 0);
     const rate = expected > 0 ? Math.round((collected / expected) * 100) : 0;
     return { label: monthFull, expected, collected, rate, pending: Math.max(0, expected - collected) };
@@ -377,14 +377,39 @@ export function MediatorDashboardPage() {
         </div>
       )}
 
-      {hasLender && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {hasLender && !hasMediator && !hasBorrower ? (
+        // Admin (lender only): 2×2 grid — no orphaned card on mobile
+        <div className="grid grid-cols-2 gap-3">
           <KpiCard label="Loans Given"  value={String(activeLender.length)}
             sub={activeLender.length !== lenderLoans.length ? `${lenderLoans.length - activeLender.length} closed` : `${lenderByBorrower.length} borrowers`} />
           <KpiCard label="Total Lent"   value={formatCurrency(totalLentPrincipal)} color="indigo" />
           <KpiCard label="Monthly Earn" value={formatCurrency(monthlyLendIncome)}  color="green" />
+          <KpiCard label="Overdue"      value={String(overdueCount)} color="red"
+            sub={overdueCount > 0 ? 'payments late' : 'all on time'} />
         </div>
-      )}
+      ) : hasLender ? (
+        // Lender with other roles: 3-card row + separate net/overdue below
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <KpiCard label="Loans Given"  value={String(activeLender.length)}
+              sub={activeLender.length !== lenderLoans.length ? `${lenderLoans.length - activeLender.length} closed` : `${lenderByBorrower.length} borrowers`} />
+            <KpiCard label="Total Lent"   value={formatCurrency(totalLentPrincipal)} color="indigo" />
+            <KpiCard label="Monthly Earn" value={formatCurrency(monthlyLendIncome)}  color="green" />
+          </div>
+          {!hasMediator && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <KpiCard
+                label={hasBorrower ? 'Net / Month' : 'Overdue'}
+                value={hasBorrower
+                  ? `${netMonthly >= 0 ? '+' : ''}${formatCurrency(netMonthly)}`
+                  : String(overdueCount)}
+                color={hasBorrower ? (netMonthly >= 0 ? 'green' : 'red') : 'red'}
+                sub={hasBorrower ? `${overdueCount} overdue` : undefined}
+              />
+            </div>
+          )}
+        </>
+      ) : null}
 
       {hasMediator && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -403,15 +428,12 @@ export function MediatorDashboardPage() {
         </div>
       )}
 
-      {!hasMediator && (hasBorrower || hasLender) && (
+      {!hasLender && !hasMediator && hasBorrower && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <KpiCard
-            label={hasBorrower && hasLender ? 'Net / Month' : 'Overdue'}
-            value={hasBorrower && hasLender
-              ? `${netMonthly >= 0 ? '+' : ''}${formatCurrency(netMonthly)}`
-              : String(overdueCount)}
-            color={hasBorrower && hasLender ? (netMonthly >= 0 ? 'green' : 'red') : 'red'}
-            sub={hasBorrower && hasLender ? `${overdueCount} overdue` : undefined}
+            label="Overdue"
+            value={String(overdueCount)}
+            color="red"
           />
         </div>
       )}
