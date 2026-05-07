@@ -9,7 +9,7 @@ import { useLoans } from '@/context/LoanContext';
 import type { Loan } from '@/types';
 import { usePayments } from '@/context/PaymentContext';
 import { useAuth } from '@/context/AuthContext';
-import { formatCurrency, formatDate, ordinal, formatRateAsRupees } from '@/utils/formatUtils';
+import { formatCurrency, formatDate, ordinal, formatRateAsRupees, formatMonthYear } from '@/utils/formatUtils';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { useToast } from '@/components/common/Toast';
 import { WhatsAppButton } from '@/components/common/WhatsAppButton';
@@ -205,18 +205,13 @@ export function MediatorDashboardPage() {
   // ── This month collection stats ──────────────────────────────
   const thisMonthStats = useMemo(() => {
     const now = new Date();
-    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const mp = myPayments.filter((p) => {
-      const pKey = p.monthYear.includes('-')
-        ? p.monthYear.slice(0, 7)
-        : (() => { const dt = new Date(p.dueDate); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`; })();
-      return pKey === currentKey;
-    });
-    const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const currentLabel = formatMonthYear(now); // "May-2026" — same format as payment.monthYear
+    const mp = myPayments.filter((p) => p.monthYear === currentLabel);
+    const monthFull = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
     const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
     const collected = mp.reduce((s, p) => s + p.amountReceived, 0);
     const rate = expected > 0 ? Math.round((collected / expected) * 100) : 0;
-    return { label: monthLabel, expected, collected, rate, pending: Math.max(0, expected - collected) };
+    return { label: monthFull, expected, collected, rate, pending: Math.max(0, expected - collected) };
   }, [myPayments]);
 
   // ── Monthly Expected vs Received chart (last 6 months) ──────
@@ -224,47 +219,23 @@ export function MediatorDashboardPage() {
     const now = new Date();
     return Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-      const yr = d.getFullYear();
-      const mo = String(d.getMonth() + 1).padStart(2, '0');
-      const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
-      const key = `${yr}-${mo}`;
+      // Use formatMonthYear so keys match payment.monthYear exactly ("May-2026")
+      const key = formatMonthYear(d);
+      const shortMonth = d.toLocaleString('en-IN', { month: 'short' }); // "May"
 
-      let expected = 0;
-      let received = 0;
-      let commission = 0;
-      let due = 0;
-      let paid = 0;
-
+      let expected = 0, received = 0, commission = 0, due = 0, paid = 0;
       for (const p of myPayments) {
-        const pKey = p.monthYear.includes('-')
-          ? p.monthYear.slice(0, 7)
-          : (() => {
-              const dt = new Date(p.dueDate);
-              return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-            })();
-
-        if (pKey !== key) continue;
-
-        if (lenderLoanIds.has(p.loanId)) {
-          expected += p.netAmountExpected;
-          received += p.amountReceived;
-        }
-        if (mediatorLoans.some((l) => l.loanId === p.loanId)) {
-          commission += p.mediatorShare;
-        }
-        if (borrowerLoanIds.has(p.loanId)) {
-          due  += p.netAmountExpected;
-          paid += p.amountReceived;
-        }
+        if (p.monthYear !== key) continue;
+        if (lenderLoanIds.has(p.loanId))                              { expected += p.netAmountExpected; received += p.amountReceived; }
+        if (mediatorLoans.some((l) => l.loanId === p.loanId))         { commission += p.mediatorShare; }
+        if (borrowerLoanIds.has(p.loanId))                            { due += p.netAmountExpected; paid += p.amountReceived; }
       }
 
-      const lenderExp = expected;
-      const lenderRec = received;
       return {
-        month: label,
-        Expected: lenderExp, Received: lenderRec,
+        month: shortMonth,
+        Expected: expected, Received: received,
         Commission: commission, Due: due, Paid: paid,
-        Rate: lenderExp > 0 ? Math.round((lenderRec / lenderExp) * 100) : 0,
+        Rate: expected > 0 ? Math.round((received / expected) * 100) : 0,
       };
     });
   }, [myPayments, lenderLoanIds, mediatorLoans, borrowerLoanIds]);
