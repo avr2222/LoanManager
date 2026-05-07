@@ -4,7 +4,7 @@ import { Plus, FileText, ArrowRight, ChevronDown, ChevronUp, CheckCircle2, Users
 import { Modal } from '@/components/common/Modal';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { LoanForm } from '@/components/loans/LoanForm';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line } from 'recharts';
 import { useLoans } from '@/context/LoanContext';
 import type { Loan } from '@/types';
 import { usePayments } from '@/context/PaymentContext';
@@ -202,6 +202,23 @@ export function MediatorDashboardPage() {
   const hasMediator = mediatorLoans.length > 0;
   const hasLender   = lenderLoans.length > 0;
 
+  // ── This month collection stats ──────────────────────────────
+  const thisMonthStats = useMemo(() => {
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const mp = myPayments.filter((p) => {
+      const pKey = p.monthYear.includes('-')
+        ? p.monthYear.slice(0, 7)
+        : (() => { const dt = new Date(p.dueDate); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`; })();
+      return pKey === currentKey;
+    });
+    const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
+    const collected = mp.reduce((s, p) => s + p.amountReceived, 0);
+    const rate = expected > 0 ? Math.round((collected / expected) * 100) : 0;
+    return { label: monthLabel, expected, collected, rate, pending: Math.max(0, expected - collected) };
+  }, [myPayments]);
+
   // ── Monthly Expected vs Received chart (last 6 months) ──────
   const monthlyChartData = useMemo(() => {
     const now = new Date();
@@ -219,7 +236,6 @@ export function MediatorDashboardPage() {
       let paid = 0;
 
       for (const p of myPayments) {
-        // Normalise monthYear to "YYYY-MM" regardless of stored format
         const pKey = p.monthYear.includes('-')
           ? p.monthYear.slice(0, 7)
           : (() => {
@@ -242,7 +258,14 @@ export function MediatorDashboardPage() {
         }
       }
 
-      return { month: label, Expected: expected, Received: received, Commission: commission, Due: due, Paid: paid };
+      const lenderExp = expected;
+      const lenderRec = received;
+      return {
+        month: label,
+        Expected: lenderExp, Received: lenderRec,
+        Commission: commission, Due: due, Paid: paid,
+        Rate: lenderExp > 0 ? Math.round((lenderRec / lenderExp) * 100) : 0,
+      };
     });
   }, [myPayments, lenderLoanIds, mediatorLoans, borrowerLoanIds]);
 
@@ -422,6 +445,46 @@ export function MediatorDashboardPage() {
         </div>
       )}
 
+      {/* ── This Month Collection ── */}
+      {thisMonthStats.expected > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+              {thisMonthStats.label} — Collection Progress
+            </p>
+            <span className={`text-sm font-bold ${
+              thisMonthStats.rate >= 90 ? 'text-emerald-500' :
+              thisMonthStats.rate >= 60 ? 'text-amber-500' : 'text-red-500'
+            }`}>{thisMonthStats.rate}%</span>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-2.5 mb-4">
+            <div
+              className={`h-2.5 rounded-full transition-all duration-500 ${
+                thisMonthStats.rate >= 90 ? 'bg-emerald-500' :
+                thisMonthStats.rate >= 60 ? 'bg-amber-400' : 'bg-indigo-500'
+              }`}
+              style={{ width: `${Math.min(100, thisMonthStats.rate)}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Expected</p>
+              <p className="text-base font-bold text-slate-700">{formatCurrency(thisMonthStats.expected)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Collected</p>
+              <p className="text-base font-bold text-emerald-600">{formatCurrency(thisMonthStats.collected)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Pending</p>
+              <p className={`text-base font-bold ${thisMonthStats.pending > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                {formatCurrency(thisMonthStats.pending)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Monthly chart ── */}
       {showChart && (
         <div className="bg-white rounded-2xl border border-slate-100 p-5">
@@ -429,37 +492,46 @@ export function MediatorDashboardPage() {
             Monthly Summary — Last 6 Months
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyChartData} barCategoryGap="30%" barGap={4}>
+            <ComposedChart data={monthlyChartData} barCategoryGap="30%" barGap={4}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
               <YAxis
+                yAxisId="left"
                 tick={{ fontSize: 11, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => v >= 1000 ? `₹${(v / 1000).toFixed(0)}k` : `₹${v}`}
                 width={48}
               />
+              {hasLender && (
+                <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} width={36} />
+              )}
               <Tooltip
-                formatter={(value, name) => [formatCurrency(typeof value === 'number' ? value : 0), String(name ?? '')]}
+                formatter={(value, name) => name === 'Rate %'
+                  ? [`${value}%`, 'Rate %']
+                  : [formatCurrency(typeof value === 'number' ? value : 0), String(name ?? '')]}
                 contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid #e2e8f0' }}
               />
               <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
               {hasLender && (
-                <Bar dataKey="Expected" name="Expected" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="left" dataKey="Expected" name="Expected" fill="#6366f1" radius={[4, 4, 0, 0]} />
               )}
               {hasLender && (
-                <Bar dataKey="Received" name="Received" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="left" dataKey="Received" name="Received" fill="#10b981" radius={[4, 4, 0, 0]} />
               )}
               {hasMediator && (
-                <Bar dataKey="Commission" name="Commission" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="left" dataKey="Commission" name="Commission" fill="#f59e0b" radius={[4, 4, 0, 0]} />
               )}
               {hasBorrower && !hasLender && (
-                <Bar dataKey="Due" name="Interest Due" fill="#e879f9" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="left" dataKey="Due" name="Interest Due" fill="#e879f9" radius={[4, 4, 0, 0]} />
               )}
               {hasBorrower && !hasLender && (
-                <Bar dataKey="Paid" name="Interest Paid" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="left" dataKey="Paid" name="Interest Paid" fill="#10b981" radius={[4, 4, 0, 0]} />
               )}
-            </BarChart>
+              {hasLender && (
+                <Line yAxisId="right" dataKey="Rate" name="Rate %" type="monotone" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3, fill: '#f59e0b' }} />
+              )}
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}
