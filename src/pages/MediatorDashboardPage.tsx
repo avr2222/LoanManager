@@ -82,14 +82,14 @@ export function MediatorDashboardPage() {
   const myPhone = norm(viewAsPhone || profilePhone || adminPhone || userPhone);
 
   const borrowerLoans = useMemo(() => {
-    if (isAdmin && !isViewAs) return [];
+    if (!myPhone) return [];
     return loans.filter((l) => norm(l.borrowerPhone) === myPhone);
-  }, [loans, myPhone, isAdmin, isViewAs]);
+  }, [loans, myPhone]);
 
   const mediatorLoans = useMemo(() => {
-    if (isAdmin && !isViewAs) return [];
+    if (!myPhone) return [];
     return loans.filter((l) => l.loanType === 'Through Mediator' && norm(l.mediatorPhone ?? '') === myPhone);
-  }, [loans, myPhone, isAdmin, isViewAs]);
+  }, [loans, myPhone]);
 
   const lenderLoans = useMemo(() => {
     if (!myPhone) return [];
@@ -166,7 +166,8 @@ export function MediatorDashboardPage() {
   );
 
   const myPayments = useMemo(() => {
-    if (isAdmin && !isViewAs) return payments; // admin sees all payments
+    // Admin with no personal loans: show all payments (system-wide overview)
+    if (isAdmin && !isViewAs && allMyLoanIds.size === 0) return payments;
     return payments.filter((p) => allMyLoanIds.has(p.loanId));
   }, [payments, allMyLoanIds, isAdmin, isViewAs]);
 
@@ -382,7 +383,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             </button>
           )}
         </div>
-        {(hasBorrower || hasMediator || hasLender) && !(isAdmin && !isViewAs) && (
+        {(hasBorrower || hasMediator || hasLender) && (
           <button
             onClick={handleDownloadPDF}
             className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-rose-500 rounded-lg hover:bg-rose-600 active:scale-95 transition-all shadow-sm"
@@ -392,8 +393,8 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         )}
       </div>
 
-      {/* ── Admin system-wide overview ── */}
-      {isAdmin && !isViewAs && adminStats && (
+      {/* ── Admin system-wide overview — only when admin has no personal loans ── */}
+      {isAdmin && !isViewAs && adminStats && !hasLender && !hasBorrower && !hasMediator && (
         <div>
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">System Overview</p>
           <div className="grid grid-cols-2 gap-3">
@@ -422,8 +423,8 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         </div>
       )}
 
-      {/* ── KPI cards — one row per role (hidden for pure admin; admin sees System Overview above) ── */}
-      {hasBorrower && !(isAdmin && !isViewAs) && (
+      {/* ── KPI cards — one row per role ── */}
+      {hasBorrower && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <KpiCard label="Loans Taken"    value={String(activeBorrower.length)}
             sub={activeBorrower.length !== borrowerLoans.length ? `${borrowerLoans.length - activeBorrower.length} closed` : undefined} />
@@ -432,7 +433,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         </div>
       )}
 
-      {!(isAdmin && !isViewAs) && hasLender && !hasMediator && !hasBorrower ? (
+      {hasLender && !hasMediator && !hasBorrower ? (
         // Lender only: 2×2 grid — no orphaned card on mobile
         <div className="grid grid-cols-2 gap-3">
           <KpiCard label="Loans Given"  value={String(activeLender.length)}
@@ -466,7 +467,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         </>
       ) : null}
 
-      {hasMediator && !(isAdmin && !isViewAs) && (
+      {hasMediator && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <KpiCard label="Loans Mediated"     value={String(activeMediator.length)}
             sub={activeMediator.length !== mediatorLoans.length ? `${mediatorLoans.length - activeMediator.length} closed` : `${mediatorByBorrower.length} borrowers`} />
@@ -483,7 +484,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         </div>
       )}
 
-      {!hasLender && !hasMediator && hasBorrower && !(isAdmin && !isViewAs) && (
+      {!hasLender && !hasMediator && hasBorrower && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <KpiCard
             label="Overdue"
