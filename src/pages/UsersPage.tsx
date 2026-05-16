@@ -402,25 +402,29 @@ export function UsersPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleToggle(u)}
-                          disabled={toggling === u.id}
-                          title={u.isActive ? 'Disable user' : 'Enable user'}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors disabled:opacity-40 ${
-                            u.isActive
-                              ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                              : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                          }`}
-                        >
-                          {toggling === u.id ? (
-                            <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          ) : u.isActive ? (
-                            <ShieldOff size={13} />
-                          ) : (
-                            <ShieldCheck size={13} />
-                          )}
-                          {u.isActive ? 'Disable' : 'Enable'}
-                        </button>
+                        {u.isSuperAdmin ? (
+                          <span className="text-xs text-indigo-500 font-semibold px-3 py-1.5">Admin</span>
+                        ) : (
+                          <button
+                            onClick={() => handleToggle(u)}
+                            disabled={toggling === u.id}
+                            title={u.isActive ? 'Disable user' : 'Enable user'}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors disabled:opacity-40 ${
+                              u.isActive
+                                ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                                : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                            }`}
+                          >
+                            {toggling === u.id ? (
+                              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : u.isActive ? (
+                              <ShieldOff size={13} />
+                            ) : (
+                              <ShieldCheck size={13} />
+                            )}
+                            {u.isActive ? 'Disable' : 'Enable'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
