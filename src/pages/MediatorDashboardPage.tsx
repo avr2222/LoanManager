@@ -103,9 +103,11 @@ export function MediatorDashboardPage() {
       closedLoans:   loans.length - active.length,
       totalPrincipal: active.reduce((s, l) => s + l.principalAmount, 0),
       monthlyExpected: active.reduce((s, l) => s + l.netMonthlyReceipt, 0),
-      totalOverdue: payments.filter(
-        (p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived'
-      ).length,
+      totalOverdue: new Set(
+        payments
+          .filter((p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived')
+          .map((p) => p.loanId)
+      ).size,
     };
   }, [loans, payments, isAdmin, isViewAs]);
 
@@ -116,6 +118,7 @@ export function MediatorDashboardPage() {
     for (const l of loans) {
       if (l.borrowerPhone) map.set(norm(l.borrowerPhone), l.borrowerName);
       if (l.mediatorPhone) map.set(norm(l.mediatorPhone), l.mediatorName || l.mediatorPhone);
+      if (l.lenderPhone)  map.set(norm(l.lenderPhone),  l.lenderName   || l.lenderPhone);
     }
     return Array.from(map.entries())
       .map(([phone, name]) => ({ phone, name }))
@@ -411,7 +414,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               label="Overdue"
               value={String(adminStats.totalOverdue)}
               color="red"
-              sub={adminStats.totalOverdue > 0 ? 'payments late' : 'all on time'}
+              sub={adminStats.totalOverdue > 0 ? 'loans overdue' : 'all on time'}
             />
           </div>
         </div>

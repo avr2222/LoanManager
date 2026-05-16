@@ -43,12 +43,11 @@ export const profilesService = {
     return fromDbProfile(data as Record<string, unknown>);
   },
 
-  // Admin: list all non-super-admin profiles
+  // Admin: list all profiles (including other super admins)
   async listAll(): Promise<Profile[]> {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('is_super_admin', false)
       .order('full_name', { ascending: true });
     if (error) return [];
     return (data as Record<string, unknown>[]).map(fromDbProfile);

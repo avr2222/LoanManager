@@ -27,7 +27,8 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
   // For mediators viewing their own loans, show lender name ("From: X") instead of their own name
   function loanTypeLabel(loan: Loan): string {
     if (loan.loanType !== 'Through Mediator') return 'Direct';
-    const isSelf = userPhone && loan.mediatorPhone === userPhone;
+    const norm = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
+    const isSelf = userPhone && norm(loan.mediatorPhone) === norm(userPhone);
     if (isSelf) return `From: ${loan.lenderName || 'Admin'}`;
     return `Via: ${loan.mediatorName || 'Mediator'}`;
   }

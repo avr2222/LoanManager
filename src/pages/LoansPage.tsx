@@ -88,10 +88,7 @@ export function LoansPage() {
     if (!hasFullAccess) return new Set<string>(); // view-only
     return new Set(loans.filter((l) =>
       (user && l.creatorId === user.id) ||
-      (myPhone && (
-        l.lenderPhone?.replace(/\D/g, '').slice(-10) === myPhone ||
-        l.borrowerPhone?.replace(/\D/g, '').slice(-10) === myPhone
-      ))
+      (myPhone && l.lenderPhone?.replace(/\D/g, '').slice(-10) === myPhone)
     ).map((l) => l.loanId));
   }, [isAdmin, hasFullAccess, loans, user, myPhone]);
 

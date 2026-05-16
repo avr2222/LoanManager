@@ -51,7 +51,7 @@ export function RegisterPage() {
     if (!inviteToken)                      return 'An invitation link is required to register.';
     if (!name.trim())                      return 'Enter your full name';
     if (!email.trim() || !email.includes('@')) return 'Enter a valid email address';
-    if (phone.replace(/\D/g, '').length < 10) return 'Enter a valid 10-digit phone number';
+    if (phone.replace(/\D/g, '').length !== 10) return 'Enter a valid 10-digit phone number';
     if (password.length < 8)               return 'Password must be at least 8 characters';
     if (password !== confirmPassword)      return 'Passwords do not match';
     return null;
