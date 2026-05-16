@@ -241,9 +241,14 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
       let expected = 0, received = 0, commission = 0, due = 0, paid = 0;
       for (const p of myPayments) {
         if (p.monthYear !== key) continue;
-        if (lenderLoanIds.has(p.loanId))                              { expected += p.netAmountExpected; received += p.amountReceived; }
-        if (mediatorLoans.some((l) => l.loanId === p.loanId))         { commission += p.mediatorShare; }
-        if (borrowerLoanIds.has(p.loanId))                            { due += p.netAmountExpected; paid += p.amountReceived; }
+        if (isAdmin && !isViewAs) {
+          expected += p.netAmountExpected;
+          received += p.amountReceived;
+        } else {
+          if (lenderLoanIds.has(p.loanId))                              { expected += p.netAmountExpected; received += p.amountReceived; }
+          if (mediatorLoans.some((l) => l.loanId === p.loanId))         { commission += p.mediatorShare; }
+          if (borrowerLoanIds.has(p.loanId))                            { due += p.netAmountExpected; paid += p.amountReceived; }
+        }
       }
 
       return {
@@ -372,7 +377,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             </button>
           )}
         </div>
-        {(hasBorrower || hasMediator || hasLender) && (
+        {(hasBorrower || hasMediator || hasLender) && !(isAdmin && !isViewAs) && (
           <button
             onClick={handleDownloadPDF}
             className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-rose-500 rounded-lg hover:bg-rose-600 active:scale-95 transition-all shadow-sm"
@@ -412,8 +417,8 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         </div>
       )}
 
-      {/* ── KPI cards — one row per role ── */}
-      {hasBorrower && (
+      {/* ── KPI cards — one row per role (hidden for pure admin; admin sees System Overview above) ── */}
+      {hasBorrower && !(isAdmin && !isViewAs) && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <KpiCard label="Loans Taken"    value={String(activeBorrower.length)}
             sub={activeBorrower.length !== borrowerLoans.length ? `${borrowerLoans.length - activeBorrower.length} closed` : undefined} />
@@ -422,8 +427,8 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         </div>
       )}
 
-      {hasLender && !hasMediator && !hasBorrower ? (
-        // Admin (lender only): 2×2 grid — no orphaned card on mobile
+      {!(isAdmin && !isViewAs) && hasLender && !hasMediator && !hasBorrower ? (
+        // Lender only: 2×2 grid — no orphaned card on mobile
         <div className="grid grid-cols-2 gap-3">
           <KpiCard label="Loans Given"  value={String(activeLender.length)}
             sub={activeLender.length !== lenderLoans.length ? `${lenderLoans.length - activeLender.length} closed` : `${lenderByBorrower.length} borrowers`} />
@@ -456,7 +461,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         </>
       ) : null}
 
-      {hasMediator && (
+      {hasMediator && !(isAdmin && !isViewAs) && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <KpiCard label="Loans Mediated"     value={String(activeMediator.length)}
             sub={activeMediator.length !== mediatorLoans.length ? `${mediatorLoans.length - activeMediator.length} closed` : `${mediatorByBorrower.length} borrowers`} />
@@ -473,7 +478,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         </div>
       )}
 
-      {!hasLender && !hasMediator && hasBorrower && (
+      {!hasLender && !hasMediator && hasBorrower && !(isAdmin && !isViewAs) && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <KpiCard
             label="Overdue"
