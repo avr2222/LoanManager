@@ -192,6 +192,7 @@ export function LoansPage() {
         readOnly={!isAdmin && !hasFullAccess}
         ownedLoanIds={ownedLoanIds}
         userPhone={userPhone}
+        roleFilter={roleFilter}
       />
 
       {/* Add Modal */}
