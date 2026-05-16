@@ -403,7 +403,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               color="indigo"
             />
             <KpiCard
-              label="Mthly Expected"
+              label="Total Mthly Due"
               value={formatCurrency(adminStats.monthlyExpected)}
               color="green"
             />

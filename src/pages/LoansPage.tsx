@@ -104,14 +104,15 @@ export function LoansPage() {
       result = result.filter((l) => norm(l.lenderPhone) === lenderFilter);
     }
     if (roleFilter === 'All') return result;
-    if (!myPhone) return result; // no phone — can't filter by role
     if (roleFilter === 'MyLoans') {
+      if (!myPhone) return []; // admin with no phone in any loan → no personal loans
       return result.filter((l) =>
         norm(l.lenderPhone) === myPhone ||
         norm(l.borrowerPhone) === myPhone ||
         norm(l.mediatorPhone) === myPhone
       );
     }
+    if (!myPhone) return [];
     if (roleFilter === 'Lender')   return result.filter((l) => norm(l.lenderPhone) === myPhone);
     if (roleFilter === 'Borrower') return result.filter((l) => norm(l.borrowerPhone) === myPhone);
     if (roleFilter === 'Mediator') return result.filter((l) => norm(l.mediatorPhone) === myPhone);
