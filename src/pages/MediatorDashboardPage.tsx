@@ -743,9 +743,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                   <td className="px-5 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
                   <td className="px-5 py-3">
                     <div className="text-sm font-medium text-slate-800">{p.borrowerName}</div>
-                    {mediatorLoanIds.has(p.loanId) && (
+                    {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
                       <div className="text-xs text-slate-400 mt-0.5">
-                        via {loans.find(l => l.loanId === p.loanId)?.lenderName || 'Lender'}
+                        Lender: {loans.find(l => l.loanId === p.loanId)?.lenderName || '—'}
                       </div>
                     )}
                   </td>
@@ -808,6 +808,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                 <div>
                   <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</p>
                   <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
+                  {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
+                    <p className="text-xs text-slate-400 mt-0.5">Lender: {loans.find(l => l.loanId === p.loanId)?.lenderName || '—'}</p>
+                  )}
                   <p className="text-xs text-amber-600 mt-0.5">Due {p.dueDate} · {p.monthYear}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -842,7 +845,12 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               {upcomingPayments.map((p) => (
                 <tr key={p.id} className="border-t border-amber-50 hover:bg-amber-50/30">
                   <td className="px-5 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
-                  <td className="px-5 py-3 text-sm font-medium text-slate-800">{p.borrowerName}</td>
+                  <td className="px-5 py-3">
+                    <div className="text-sm font-medium text-slate-800">{p.borrowerName}</div>
+                    {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
+                      <div className="text-xs text-slate-400 mt-0.5">Lender: {loans.find(l => l.loanId === p.loanId)?.lenderName || '—'}</div>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-sm text-slate-600">{p.monthYear}</td>
                   <td className="px-5 py-3 text-sm text-slate-500">{p.dueDate}</td>
                   <td className="px-5 py-3 text-sm font-semibold text-slate-800">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</td>
