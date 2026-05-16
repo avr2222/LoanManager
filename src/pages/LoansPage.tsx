@@ -10,7 +10,7 @@ import { LoanForm } from '@/components/loans/LoanForm';
 import { LoanTable } from '@/components/loans/LoanTable';
 import { useAuth } from '@/context/AuthContext';
 
-type RoleFilter = 'All' | 'Lender' | 'Borrower' | 'Mediator';
+type RoleFilter = 'MyLoans' | 'All' | 'Lender' | 'Borrower' | 'Mediator';
 
 export function LoansPage() {
   const { loans, addLoan, updateLoan, deleteLoan, setLoanStatus } = useLoans();
@@ -24,7 +24,21 @@ export function LoansPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | undefined>();
   const [deletingLoanId, setDeletingLoanId] = useState<string | null>(null);
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>('All');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('MyLoans');
+  const [lenderFilter, setLenderFilter] = useState(''); // admin only: filter by lender phone
+
+  // Unique lenders in the system (admin only)
+  const knownLenders = useMemo(() => {
+    if (!isAdmin) return [];
+    const map = new Map<string, string>();
+    for (const l of loans) {
+      const p = (l.lenderPhone ?? '').replace(/\D/g, '').slice(-10);
+      if (p) map.set(p, l.lenderName || p);
+    }
+    return Array.from(map.entries())
+      .map(([phone, name]) => ({ phone, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [loans, isAdmin]);
 
   async function handleAdd(loan: Loan) {
     try {
@@ -81,17 +95,28 @@ export function LoansPage() {
     ).map((l) => l.loanId));
   }, [isAdmin, hasFullAccess, loans, user, myPhone]);
 
-  // Role filter — only relevant when user has a phone and is a non-admin
+  // Role filter — default 'MyLoans' shows only loans where user has any role
   const roleFilteredLoans = useMemo(() => {
-    if (roleFilter === 'All' || !myPhone) return loans;
-    return loans.filter((l) => {
-      const norm = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
-      if (roleFilter === 'Lender')   return norm(l.lenderPhone) === myPhone;
-      if (roleFilter === 'Borrower') return norm(l.borrowerPhone) === myPhone;
-      if (roleFilter === 'Mediator') return norm(l.mediatorPhone) === myPhone;
-      return true;
-    });
-  }, [loans, roleFilter, myPhone]);
+    const norm = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
+    let result = loans;
+    // Admin: filter by selected lender first
+    if (isAdmin && lenderFilter) {
+      result = result.filter((l) => norm(l.lenderPhone) === lenderFilter);
+    }
+    if (roleFilter === 'All') return result;
+    if (!myPhone) return result; // no phone — can't filter by role
+    if (roleFilter === 'MyLoans') {
+      return result.filter((l) =>
+        norm(l.lenderPhone) === myPhone ||
+        norm(l.borrowerPhone) === myPhone ||
+        norm(l.mediatorPhone) === myPhone
+      );
+    }
+    if (roleFilter === 'Lender')   return result.filter((l) => norm(l.lenderPhone) === myPhone);
+    if (roleFilter === 'Borrower') return result.filter((l) => norm(l.borrowerPhone) === myPhone);
+    if (roleFilter === 'Mediator') return result.filter((l) => norm(l.mediatorPhone) === myPhone);
+    return result;
+  }, [loans, roleFilter, myPhone, isAdmin, lenderFilter]);
 
   const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
 
@@ -114,25 +139,50 @@ export function LoansPage() {
         ))}
       </div>
 
-      {/* Role filter chips */}
-      {myPhone && (
-        <div className="flex gap-1.5 mb-4 flex-wrap">
-          {(['All', 'Lender', 'Borrower', 'Mediator'] as RoleFilter[]).map((r) => (
+      {/* Lender selector — admin only */}
+      {isAdmin && knownLenders.length > 1 && (
+        <div className="flex items-center gap-2 mb-3">
+          <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest shrink-0">Lender</label>
+          <select
+            value={lenderFilter}
+            onChange={(e) => setLenderFilter(e.target.value)}
+            className="text-sm border border-slate-200 rounded-xl px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          >
+            <option value="">All Lenders ({loans.length})</option>
+            {knownLenders.map(({ phone, name }) => (
+              <option key={phone} value={phone}>
+                {name} — {phone}
+              </option>
+            ))}
+          </select>
+          {lenderFilter && (
             <button
-              key={r}
-              onClick={() => setRoleFilter(r)}
-              className={`px-3.5 py-1 text-xs font-semibold rounded-full border transition-all ${
-                roleFilter === r
-                  ? 'text-white border-transparent shadow-sm shadow-indigo-200'
-                  : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-600'
-              }`}
-              style={roleFilter === r ? { background: 'linear-gradient(135deg, #6366f1, #4f46e5)' } : {}}
+              onClick={() => setLenderFilter('')}
+              className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors"
             >
-              {r === 'All' ? 'All Loans' : `As ${r}`}
+              Clear
             </button>
-          ))}
+          )}
         </div>
       )}
+
+      {/* Role filter chips */}
+      <div className="flex gap-1.5 mb-4 flex-wrap">
+        {(['MyLoans', 'All', ...(myPhone ? ['Lender', 'Borrower', 'Mediator'] : [])] as RoleFilter[]).map((r) => (
+          <button
+            key={r}
+            onClick={() => setRoleFilter(r)}
+            className={`px-3.5 py-1 text-xs font-semibold rounded-full border transition-all ${
+              roleFilter === r
+                ? 'text-white border-transparent shadow-sm shadow-indigo-200'
+                : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-600'
+            }`}
+            style={roleFilter === r ? { background: 'linear-gradient(135deg, #6366f1, #4f46e5)' } : {}}
+          >
+            {r === 'MyLoans' ? 'My Loans' : r === 'All' ? 'All Loans' : `As ${r}`}
+          </button>
+        ))}
+      </div>
 
       <LoanTable
         loans={roleFilteredLoans}
