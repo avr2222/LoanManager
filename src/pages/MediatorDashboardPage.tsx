@@ -76,7 +76,7 @@ export function MediatorDashboardPage() {
 
   const isViewAs = !!viewAsPhone;
 
-  // Admin (no view-as): sees ALL loans as lender. Phone users: filtered by own phone.
+  // Admin (no view-as): uses their own phone for role filters like any other user.
   const myPhone = norm(viewAsPhone || userPhone);
 
   const borrowerLoans = useMemo(() => {
@@ -90,9 +90,24 @@ export function MediatorDashboardPage() {
   }, [loans, myPhone, isAdmin, isViewAs]);
 
   const lenderLoans = useMemo(() => {
-    if (isAdmin && !isViewAs) return loans; // admin owns all loans
+    if (!myPhone) return [];
     return loans.filter((l) => l.lenderPhone && norm(l.lenderPhone) === myPhone);
-  }, [loans, myPhone, isAdmin, isViewAs]);
+  }, [loans, myPhone]);
+
+  // System-wide stats for admin overview (only when not viewing as another user)
+  const adminStats = useMemo(() => {
+    if (!isAdmin || isViewAs) return null;
+    const active = loans.filter((l) => l.loanStatus === 'Active');
+    return {
+      totalLoans:    active.length,
+      closedLoans:   loans.length - active.length,
+      totalPrincipal: active.reduce((s, l) => s + l.principalAmount, 0),
+      monthlyExpected: active.reduce((s, l) => s + l.netMonthlyReceipt, 0),
+      totalOverdue: payments.filter(
+        (p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived'
+      ).length,
+    };
+  }, [loans, payments, isAdmin, isViewAs]);
 
   // Known phone users for admin "View As" picker
   const knownUsers = useMemo(() => {
@@ -366,6 +381,36 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
           </button>
         )}
       </div>
+
+      {/* ── Admin system-wide overview ── */}
+      {isAdmin && !isViewAs && adminStats && (
+        <div>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">System Overview</p>
+          <div className="grid grid-cols-2 gap-3">
+            <KpiCard
+              label="Active Loans"
+              value={String(adminStats.totalLoans)}
+              sub={adminStats.closedLoans > 0 ? `${adminStats.closedLoans} closed` : `${loans.length} total`}
+            />
+            <KpiCard
+              label="Total Principal"
+              value={formatCurrency(adminStats.totalPrincipal)}
+              color="indigo"
+            />
+            <KpiCard
+              label="Mthly Expected"
+              value={formatCurrency(adminStats.monthlyExpected)}
+              color="green"
+            />
+            <KpiCard
+              label="Overdue"
+              value={String(adminStats.totalOverdue)}
+              color="red"
+              sub={adminStats.totalOverdue > 0 ? 'payments late' : 'all on time'}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── KPI cards — one row per role ── */}
       {hasBorrower && (

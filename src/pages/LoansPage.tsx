@@ -115,7 +115,7 @@ export function LoansPage() {
       </div>
 
       {/* Role filter chips */}
-      {myPhone && !isAdmin && (
+      {myPhone && (
         <div className="flex gap-1.5 mb-4 flex-wrap">
           {(['All', 'Lender', 'Borrower', 'Mediator'] as RoleFilter[]).map((r) => (
             <button
