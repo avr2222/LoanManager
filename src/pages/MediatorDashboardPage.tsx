@@ -64,7 +64,7 @@ interface BorrowerGroup {
 export function MediatorDashboardPage() {
   const { loans, updateLoan, deleteLoan } = useLoans();
   const { payments, updatePayment, deletePaymentsByLoan } = usePayments();
-  const { userPhone, hasFullAccess, isAdmin, profile } = useAuth();
+  const { userPhone, hasFullAccess, isAdmin, profile, phone: profilePhone, adminPhone } = useAuth();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const [showClosedLoans, setShowClosedLoans]   = useState(false);
@@ -77,7 +77,9 @@ export function MediatorDashboardPage() {
   const isViewAs = !!viewAsPhone;
 
   // Admin (no view-as): uses their own phone for role filters like any other user.
-  const myPhone = norm(viewAsPhone || userPhone);
+  // profilePhone (profiles.phone) is preferred; adminPhone (user_metadata) is fallback
+  // in case profiles.phone was not synced when admin first set their phone.
+  const myPhone = norm(viewAsPhone || profilePhone || adminPhone || userPhone);
 
   const borrowerLoans = useMemo(() => {
     if (isAdmin && !isViewAs) return [];

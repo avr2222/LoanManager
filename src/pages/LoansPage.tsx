@@ -14,17 +14,17 @@ type RoleFilter = 'MyLoans' | 'All' | 'Lender' | 'Borrower' | 'Mediator';
 
 export function LoansPage() {
   const { loans, addLoan, updateLoan, deleteLoan, setLoanStatus } = useLoans();
-  const { isAdmin, hasFullAccess, userPhone, displayName, phone, user } = useAuth();
+  const { isAdmin, hasFullAccess, userPhone, displayName, phone, adminPhone, user } = useAuth();
   const { deletePaymentsByLoan } = usePayments();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
-  const myPhone = phone.replace(/\D/g, '').slice(-10);
+  const myPhone = (phone || adminPhone || '').replace(/\D/g, '').slice(-10);
 
   const [showForm, setShowForm] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | undefined>();
   const [deletingLoanId, setDeletingLoanId] = useState<string | null>(null);
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>('MyLoans');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>(isAdmin ? 'All' : 'MyLoans');
   const [lenderFilter, setLenderFilter] = useState(''); // admin only: filter by lender phone
 
   // Unique lenders in the system (admin only)
