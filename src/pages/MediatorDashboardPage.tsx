@@ -218,6 +218,8 @@ export function MediatorDashboardPage() {
   const lenderLoanIds   = useMemo(() => new Set(lenderLoans.map((l) => l.loanId)),   [lenderLoans]);
   // Loans where I am the borrower — show full interest amount and "Paid" label
   const borrowerLoanIds = useMemo(() => new Set(borrowerLoans.map((l) => l.loanId)), [borrowerLoans]);
+  // Loans where I am the mediator — show lender context in overdue/upcoming tables
+  const mediatorLoanIds = useMemo(() => new Set(mediatorLoans.map((l) => l.loanId)), [mediatorLoans]);
 
   const hasBorrower = borrowerLoans.length > 0;
   const hasMediator = mediatorLoans.length > 0;
@@ -690,6 +692,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                 <div>
                   <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</p>
                   <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
+                  {mediatorLoanIds.has(p.loanId) && (
+                    <p className="text-xs text-slate-400">via {loans.find(l => l.loanId === p.loanId)?.lenderName || 'Lender'}</p>
+                  )}
                   <p className="text-xs text-red-500 font-semibold mt-0.5">{p.daysOverdue} days overdue · Due {p.dueDate}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -699,6 +704,15 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                       message={overdueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, daysOverdue: p.daysOverdue, upiId: profile?.upiId ?? undefined })}
                     />
                   )}
+                  {mediatorLoanIds.has(p.loanId) && (() => {
+                    const loan = loans.find(l => l.loanId === p.loanId);
+                    return loan?.lenderPhone ? (
+                      <WhatsAppButton
+                        phone={loan.lenderPhone}
+                        message={`Hi ${loan.lenderName || 'there'}, ${p.borrowerName}'s payment for ${p.monthYear} is overdue by ${p.daysOverdue} days (₹${p.netAmountExpected}). Please follow up.`}
+                      />
+                    ) : null;
+                  })()}
                   {hasFullAccess && lenderLoanIds.has(p.loanId) && (
                     <button onClick={() => handleMarkReceived(p.id)}
                       className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-2.5 py-1.5 rounded-lg transition-all shadow-sm">
@@ -727,7 +741,14 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               {overduePayments.map((p) => (
                 <tr key={p.id} className="border-t border-red-50 hover:bg-red-50/30">
                   <td className="px-5 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
-                  <td className="px-5 py-3 text-sm font-medium text-slate-800">{p.borrowerName}</td>
+                  <td className="px-5 py-3">
+                    <div className="text-sm font-medium text-slate-800">{p.borrowerName}</div>
+                    {mediatorLoanIds.has(p.loanId) && (
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        via {loans.find(l => l.loanId === p.loanId)?.lenderName || 'Lender'}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-sm text-slate-600">{p.monthYear}</td>
                   <td className="px-5 py-3 text-sm text-slate-500">{p.dueDate}</td>
                   <td className="px-5 py-3">
@@ -742,6 +763,15 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                           message={overdueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, daysOverdue: p.daysOverdue, upiId: profile?.upiId ?? undefined })}
                         />
                       )}
+                      {mediatorLoanIds.has(p.loanId) && (() => {
+                        const loan = loans.find(l => l.loanId === p.loanId);
+                        return loan?.lenderPhone ? (
+                          <WhatsAppButton
+                            phone={loan.lenderPhone}
+                            message={`Hi ${loan.lenderName || 'there'}, ${p.borrowerName}'s payment for ${p.monthYear} is overdue by ${p.daysOverdue} days (₹${p.netAmountExpected}). Please follow up.`}
+                          />
+                        ) : null;
+                      })()}
                       {hasFullAccess && lenderLoanIds.has(p.loanId) && (
                         <button onClick={() => handleMarkReceived(p.id)}
                           className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
