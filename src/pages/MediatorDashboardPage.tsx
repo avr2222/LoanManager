@@ -83,17 +83,17 @@ export function MediatorDashboardPage() {
 
   const borrowerLoans = useMemo(() => {
     if (!myPhone) return [];
-    return loans.filter((l) => norm(l.borrowerPhone) === myPhone);
+    return loans.filter((l) => l.loanStatus === 'Active' && norm(l.borrowerPhone) === myPhone);
   }, [loans, myPhone]);
 
   const mediatorLoans = useMemo(() => {
     if (!myPhone) return [];
-    return loans.filter((l) => l.loanType === 'Through Mediator' && norm(l.mediatorPhone ?? '') === myPhone);
+    return loans.filter((l) => l.loanStatus === 'Active' && l.loanType === 'Through Mediator' && norm(l.mediatorPhone ?? '') === myPhone);
   }, [loans, myPhone]);
 
   const lenderLoans = useMemo(() => {
     if (!myPhone) return [];
-    return loans.filter((l) => l.lenderPhone && norm(l.lenderPhone) === myPhone);
+    return loans.filter((l) => l.loanStatus === 'Active' && l.lenderPhone && norm(l.lenderPhone) === myPhone);
   }, [loans, myPhone]);
 
   // System-wide stats for admin overview (only when not viewing as another user)
@@ -200,17 +200,13 @@ export function MediatorDashboardPage() {
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [myPayments]);
 
-  // KPI amounts — Active loans only
-  const activeBorrower = borrowerLoans.filter((l) => l.loanStatus === 'Active');
-  const activeMediator = mediatorLoans.filter((l) => l.loanStatus === 'Active');
-  const activeLender   = lenderLoans.filter((l) => l.loanStatus === 'Active');
-
-  const totalBorrowed          = activeBorrower.reduce((s, l) => s + l.principalAmount, 0);
-  const totalMonthlyDue        = activeBorrower.reduce((s, l) => s + l.monthlyInterestAmount, 0);
-  const monthlyCommission      = activeMediator.reduce((s, l) => s + l.mediatorMonthlyShare, 0);
-  const totalMediatedPrincipal = activeMediator.reduce((s, l) => s + l.principalAmount, 0);
-  const monthlyLendIncome      = activeLender.reduce((s, l) => s + l.netMonthlyReceipt, 0);
-  const totalLentPrincipal     = activeLender.reduce((s, l) => s + l.principalAmount, 0);
+  // KPI amounts — active loans only (base arrays already filtered to Active)
+  const totalBorrowed          = borrowerLoans.reduce((s, l) => s + l.principalAmount, 0);
+  const totalMonthlyDue        = borrowerLoans.reduce((s, l) => s + l.monthlyInterestAmount, 0);
+  const monthlyCommission      = mediatorLoans.reduce((s, l) => s + l.mediatorMonthlyShare, 0);
+  const totalMediatedPrincipal = mediatorLoans.reduce((s, l) => s + l.principalAmount, 0);
+  const monthlyLendIncome      = lenderLoans.reduce((s, l) => s + l.netMonthlyReceipt, 0);
+  const totalLentPrincipal     = lenderLoans.reduce((s, l) => s + l.principalAmount, 0);
   const netMonthly             = monthlyLendIncome + monthlyCommission - totalMonthlyDue;
   const overdueCount           = myPayments.filter((p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived').length;
 
@@ -428,8 +424,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
       {/* ── KPI cards — one row per role ── */}
       {hasBorrower && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <KpiCard label="Loans Taken"    value={String(activeBorrower.length)}
-            sub={activeBorrower.length !== borrowerLoans.length ? `${borrowerLoans.length - activeBorrower.length} closed` : undefined} />
+          <KpiCard label="Loans Taken"    value={String(borrowerLoans.length)} />
           <KpiCard label="Total Borrowed" value={formatCurrency(totalBorrowed)}  color="indigo" />
           <KpiCard label="Monthly Pay"    value={formatCurrency(totalMonthlyDue)} color="red" />
         </div>
@@ -438,8 +433,8 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
       {hasLender && !hasMediator && !hasBorrower ? (
         // Lender only: 2×2 grid — no orphaned card on mobile
         <div className="grid grid-cols-2 gap-3">
-          <KpiCard label="Loans Given"  value={String(activeLender.length)}
-            sub={activeLender.length !== lenderLoans.length ? `${lenderLoans.length - activeLender.length} closed` : `${lenderByBorrower.length} borrowers`} />
+          <KpiCard label="Loans Given"  value={String(lenderLoans.length)}
+            sub={`${lenderByBorrower.length} borrowers`} />
           <KpiCard label="Total Lent"   value={formatCurrency(totalLentPrincipal)} color="indigo" />
           <KpiCard label="Monthly Earn" value={formatCurrency(monthlyLendIncome)}  color="green" />
           <KpiCard label="Overdue"      value={String(overdueCount)} color="red"
@@ -449,8 +444,8 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         // Lender with other roles: 3-card row + separate net/overdue below
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <KpiCard label="Loans Given"  value={String(activeLender.length)}
-              sub={activeLender.length !== lenderLoans.length ? `${lenderLoans.length - activeLender.length} closed` : `${lenderByBorrower.length} borrowers`} />
+            <KpiCard label="Loans Given"  value={String(lenderLoans.length)}
+              sub={`${lenderByBorrower.length} borrowers`} />
             <KpiCard label="Total Lent"   value={formatCurrency(totalLentPrincipal)} color="indigo" />
             <KpiCard label="Monthly Earn" value={formatCurrency(monthlyLendIncome)}  color="green" />
           </div>
@@ -471,8 +466,8 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
 
       {hasMediator && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Loans Mediated"     value={String(activeMediator.length)}
-            sub={activeMediator.length !== mediatorLoans.length ? `${mediatorLoans.length - activeMediator.length} closed` : `${mediatorByBorrower.length} borrowers`} />
+          <KpiCard label="Loans Mediated"     value={String(mediatorLoans.length)}
+            sub={`${mediatorByBorrower.length} borrowers`} />
           <KpiCard label="Mediated Principal" value={formatCurrency(totalMediatedPrincipal)} color="indigo" />
           <KpiCard label="Commission / mo"    value={formatCurrency(monthlyCommission)}      color="green" />
           <KpiCard
