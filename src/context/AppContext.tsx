@@ -147,6 +147,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]); // user?.id — not user — so token refresh doesn't re-trigger a full reload
 
+  // Re-run payment generation when a loan is added or deleted mid-session.
+  // Idempotent: buildMissingPayments skips months already in `payments`.
+  useEffect(() => {
+    if (loading || loans.length === 0) return;
+    const missing = buildMissingPayments(loans, payments);
+    if (missing.length === 0) return;
+    paymentsService.bulkUpsert(missing).then(() => {
+      bulkLoadPayments([...payments, ...missing]);
+    }).catch(console.warn);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loans.length]); // loans.length — fires only on add/delete, not on edit
+
   const importFile = useCallback(async (file: File) => {
     const result = await importFromExcel(file);
     console.log('[Import] Parsed:', result.loans.length, 'loans,', result.payments.length, 'payments');
