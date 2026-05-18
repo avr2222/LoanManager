@@ -115,8 +115,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           const missing = buildMissingPayments(l, p);
           if (missing.length > 0) {
-            console.log(`[AutoGen] Creating ${missing.length} missing payment(s)`);
-            await paymentsService.bulkUpsert(missing);
+            try {
+              await paymentsService.bulkUpsert(missing);
+            } catch (err) {
+              console.warn('[AutoGen] Could not persist payments (RLS?), using in-memory:', err);
+            }
             bulkLoadPayments([...p, ...missing]);
           }
         } else if (isAdmin) {
@@ -153,9 +156,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (loading || loans.length === 0) return;
     const missing = buildMissingPayments(loans, payments);
     if (missing.length === 0) return;
-    paymentsService.bulkUpsert(missing).then(() => {
-      bulkLoadPayments([...payments, ...missing]);
-    }).catch(console.warn);
+    paymentsService.bulkUpsert(missing)
+      .catch((err) => console.warn('[AutoGen] Could not persist payments:', err))
+      .finally(() => bulkLoadPayments([...payments, ...missing]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loans.length]); // loans.length — fires only on add/delete, not on edit
 
