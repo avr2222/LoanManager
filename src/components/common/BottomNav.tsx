@@ -1,20 +1,22 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, CreditCard, BarChart3, Upload, Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 
-const commonNav = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/loans',     icon: CreditCard,      label: 'Loans' },
-  { to: '/payments',  icon: BarChart3,        label: 'Payments' },
-];
-
-const adminOnlyNav = [
-  { to: '/users',  icon: Users,  label: 'Users' },
-  { to: '/import', icon: Upload, label: 'Import' },
-];
-
 export function BottomNav() {
+  const { t } = useTranslation();
   const { isAdmin } = useAuth();
+
+  const commonNav = [
+    { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: '/loans',     icon: CreditCard,      label: t('nav.loans') },
+    { to: '/payments',  icon: BarChart3,        label: t('nav.payments') },
+  ];
+  const adminOnlyNav = [
+    { to: '/users',  icon: Users,  label: t('nav.users') },
+    { to: '/import', icon: Upload, label: t('nav.importShort') },
+  ];
+
   const navItems = isAdmin ? [...commonNav, ...adminOnlyNav] : commonNav;
 
   return (

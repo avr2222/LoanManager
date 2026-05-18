@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Edit2, Trash2, XCircle, Plus, Search, ChevronUp, ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Loan, LoanStatus } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -40,20 +41,21 @@ function getCounterparty(loan: Loan, roleFilter: RoleFilter | undefined, userPho
 type SortKey = 'loanId' | 'borrowerName' | 'principalAmount' | 'monthlyInterestAmount' | 'loanStatus' | 'dateGiven';
 
 export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowClick, readOnly, ownedLoanIds, userPhone, roleFilter }: LoanTableProps) {
+  const { t } = useTranslation();
   const canAct = (loan: Loan) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(loan.loanId));
 
   const counterpartyLabel =
-    roleFilter === 'Borrower' ? 'Lender' :
-    roleFilter === 'MyLoans'  ? 'Counterparty' :
-    'Borrower';
+    roleFilter === 'Borrower' ? t('loans.lender') :
+    roleFilter === 'MyLoans'  ? t('loans.counterparty') :
+    t('loans.borrower');
 
   // For mediators viewing their own loans, show lender name ("From: X") instead of their own name
   function loanTypeLabel(loan: Loan): string {
-    if (loan.loanType !== 'Through Mediator') return 'Direct';
+    if (loan.loanType !== 'Through Mediator') return t('loans.direct');
     const norm = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
     const isSelf = userPhone && norm(loan.mediatorPhone) === norm(userPhone);
-    if (isSelf) return `From: ${loan.lenderName || 'Admin'}`;
-    return `Via: ${loan.mediatorName || 'Mediator'}`;
+    if (isSelf) return t('loans.fromLender', { name: loan.lenderName || 'Admin' });
+    return t('loans.viaMediator', { name: loan.mediatorName || t('loans.mediator') });
   }
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<LoanStatus | 'All'>('Active');
@@ -115,11 +117,11 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
   // Desktop only — mobile uses infinite scroll instead
   const pagination = totalPages > 1 && (
     <div className="hidden md:flex items-center justify-between mt-4 text-sm text-slate-500">
-      <span>{filtered.length} loans</span>
+      <span>{filtered.length} {t('nav.loans').toLowerCase()}</span>
       <div className="flex gap-2">
-        <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50">Prev</button>
+        <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50">{t('common.prev')}</button>
         <span className="px-3 py-1.5">{page}/{totalPages}</span>
-        <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="px-3 py-1.5 border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50">Next</button>
+        <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="px-3 py-1.5 border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50">{t('common.next')}</button>
       </div>
     </div>
   );
@@ -132,7 +134,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search loans..."
+            placeholder={t('loans.searchLoans')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); setMobilePage(1); }}
             className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
@@ -143,11 +145,11 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
           onChange={(e) => { setStatusFilter(e.target.value as LoanStatus | 'All'); setPage(1); setMobilePage(1); }}
           className="px-2 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none"
         >
-          <option value="All">All</option>
-          <option value="Active">Active</option>
-          <option value="Closed">Closed</option>
-          <option value="Defaulted">Defaulted</option>
-          <option value="Restructured">Restructured</option>
+          <option value="All">{t('common.all')}</option>
+          <option value="Active">{t('common.active')}</option>
+          <option value="Closed">{t('common.closed')}</option>
+          <option value="Defaulted">{t('common.defaulted')}</option>
+          <option value="Restructured">{t('common.restructured')}</option>
         </select>
         {!readOnly && (
           <button
@@ -155,8 +157,8 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
             className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 shrink-0"
           >
             <Plus size={15} />
-            <span className="hidden sm:inline">Add Loan</span>
-            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">{t('loans.addLoan')}</span>
+            <span className="sm:hidden">{t('common.add')}</span>
           </button>
         )}
       </div>
@@ -164,9 +166,9 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
       {filtered.length === 0 ? (
         <EmptyState
           icon={Plus}
-          title="No loans found"
-          description="Add your first loan or import from Excel to get started."
-          action={{ label: 'Add Loan', onClick: onAdd }}
+          title={t('loans.noLoansFound')}
+          description={t('loans.noLoansDesc')}
+          action={{ label: t('loans.addLoan'), onClick: onAdd }}
         />
       ) : (
         <>
@@ -220,11 +222,11 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
             {/* Infinite scroll sentinel */}
             {hasMoreMobile && (
               <div ref={sentinelRef} className="py-4 flex justify-center">
-                <span className="text-xs text-slate-400">Loading more…</span>
+                <span className="text-xs text-slate-400">{t('common.loadingMore')}</span>
               </div>
             )}
             {!hasMoreMobile && filtered.length > PAGE_SIZE && (
-              <p className="text-center text-xs text-slate-400 py-3">All {filtered.length} loans shown</p>
+              <p className="text-center text-xs text-slate-400 py-3">{t('common.allShown', { count: filtered.length })}</p>
             )}
           </div>
 
@@ -234,15 +236,15 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
               <table className="min-w-full divide-y divide-slate-100">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className={thClass} onClick={() => toggleSort('loanId')}><span className="flex items-center gap-1">Loan ID <SortIcon col="loanId" /></span></th>
+                    <th className={thClass} onClick={() => toggleSort('loanId')}><span className="flex items-center gap-1">{t('loans.loanId')} <SortIcon col="loanId" /></span></th>
                     <th className={thClass} onClick={() => toggleSort('borrowerName')}><span className="flex items-center gap-1">{counterpartyLabel} <SortIcon col="borrowerName" /></span></th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Type</th>
-                    <th className={thClass} onClick={() => toggleSort('principalAmount')}><span className="flex items-center gap-1">Principal <SortIcon col="principalAmount" /></span></th>
-                    <th className={thClass} onClick={() => toggleSort('monthlyInterestAmount')}><span className="flex items-center gap-1">Monthly <SortIcon col="monthlyInterestAmount" /></span></th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Net Receipt</th>
-                    <th className={thClass} onClick={() => toggleSort('dateGiven')}><span className="flex items-center gap-1">Date Given <SortIcon col="dateGiven" /></span></th>
-                    <th className={thClass} onClick={() => toggleSort('loanStatus')}><span className="flex items-center gap-1">Status <SortIcon col="loanStatus" /></span></th>
-                    {!readOnly && <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Actions</th>}
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">{t('loans.type')}</th>
+                    <th className={thClass} onClick={() => toggleSort('principalAmount')}><span className="flex items-center gap-1">{t('loans.principal')} <SortIcon col="principalAmount" /></span></th>
+                    <th className={thClass} onClick={() => toggleSort('monthlyInterestAmount')}><span className="flex items-center gap-1">{t('loans.monthly')} <SortIcon col="monthlyInterestAmount" /></span></th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">{t('loans.netMonthly')}</th>
+                    <th className={thClass} onClick={() => toggleSort('dateGiven')}><span className="flex items-center gap-1">{t('loans.dateGiven')} <SortIcon col="dateGiven" /></span></th>
+                    <th className={thClass} onClick={() => toggleSort('loanStatus')}><span className="flex items-center gap-1">{t('loans.status')} <SortIcon col="loanStatus" /></span></th>
+                    {!readOnly && <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">{t('loans.actions')}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">

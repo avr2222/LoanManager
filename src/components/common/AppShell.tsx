@@ -1,29 +1,31 @@
 import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { ShieldAlert, X, Ban } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { BottomNav } from './BottomNav';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 
-const pageTitles: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/loans':     'Loans',
-  '/payments':  'Payments',
-  '/mediators': 'Mediators',
-  '/users':     'Users',
-  '/import':    'Import / Export',
-};
-
 export function AppShell() {
+  const { t } = useTranslation();
   const { loading, autoImporting } = useApp();
   const { needsFirstTimeSetup, isDisabled, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const title = pageTitles[location.pathname] ?? 'Loan Book';
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
+  const pageTitles: Record<string, string> = {
+    '/dashboard': t('nav.dashboard'),
+    '/loans':     t('nav.loans'),
+    '/payments':  t('nav.payments'),
+    '/mediators': 'Mediators',
+    '/users':     t('nav.users'),
+    '/import':    t('nav.import'),
+  };
+
+  const title = pageTitles[location.pathname] ?? t('nav.loanBook');
   const showBanner = needsFirstTimeSetup && !bannerDismissed && location.pathname !== '/set-password';
 
   if (loading || autoImporting) {
@@ -36,7 +38,7 @@ export function AppShell() {
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           </div>
           <p className="text-sm font-medium text-slate-500">
-            {autoImporting ? 'Importing loan data…' : 'Loading…'}
+            {autoImporting ? t('app.importing') : t('app.loading')}
           </p>
         </div>
       </div>
@@ -51,15 +53,13 @@ export function AppShell() {
             style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
             <Ban size={24} className="text-white" />
           </div>
-          <h1 className="text-lg font-bold text-slate-800 tracking-tight mb-2">Account Disabled</h1>
-          <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-            Your account has been disabled by the administrator. Please contact them to regain access.
-          </p>
+          <h1 className="text-lg font-bold text-slate-800 tracking-tight mb-2">{t('app.accountDisabled')}</h1>
+          <p className="text-sm text-slate-400 mb-6 leading-relaxed">{t('app.disabledMessage')}</p>
           <button
             onClick={signOut}
             className="px-5 py-2.5 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-xl shadow-sm transition-colors"
           >
-            Sign Out
+            {t('app.signOut')}
           </button>
         </div>
       </div>
@@ -78,7 +78,7 @@ export function AppShell() {
             <div className="flex items-center gap-2 min-w-0">
               <ShieldAlert size={15} className="text-amber-600 shrink-0" />
               <p className="text-xs text-amber-800 truncate">
-                You're in <strong>view-only mode</strong>. Set a password to add loans and mark payments.
+                {t('app.viewOnlyBanner')}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -86,7 +86,7 @@ export function AppShell() {
                 onClick={() => navigate('/set-password')}
                 className="text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 px-3 py-1 rounded-lg transition-colors"
               >
-                Set Password
+                {t('app.setPassword')}
               </button>
               <button onClick={() => setBannerDismissed(true)} className="text-amber-500 hover:text-amber-700">
                 <X size={15} />

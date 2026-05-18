@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { HandCoins, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const { signIn, signInWithPhone, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -33,7 +35,6 @@ export function LoginPage() {
     setError('');
     setLoading(true);
 
-    // If input looks like a phone number, use phone login (creates @user.local email internally)
     const cleaned = email.replace(/\D/g, '');
     const isPhone = cleaned.length === 10;
     const { error: err } = isPhone
@@ -49,7 +50,6 @@ export function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
       style={{ background: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99,102,241,0.08) 0%, transparent 70%), #f8fafc' }}>
 
-      {/* Decorative blobs */}
       <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full opacity-20 blur-3xl pointer-events-none"
         style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }} />
       <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full opacity-10 blur-3xl pointer-events-none"
@@ -57,23 +57,21 @@ export function LoginPage() {
 
       <div className="w-full max-w-sm relative z-10">
 
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5 shadow-xl shadow-indigo-500/20"
             style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}>
             <HandCoins size={24} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Welcome back</h1>
-          <p className="text-slate-400 text-sm mt-1.5">Sign in to your Loan Book</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{t('auth.welcomeBack')}</h1>
+          <p className="text-slate-400 text-sm mt-1.5">{t('auth.signInSubtitle')}</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6">
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
 
-            {/* Email or Phone */}
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-                Email or Mobile Number
+                {t('auth.emailOrPhone')}
               </label>
               <input
                 type="text"
@@ -87,18 +85,17 @@ export function LoginPage() {
               />
             </div>
 
-            {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                  Password
+                  {t('auth.password')}
                 </label>
                 <button
                   type="button"
                   onClick={() => setShowForgot(true)}
                   className="text-xs text-indigo-500 hover:text-indigo-700 font-medium transition-colors"
                 >
-                  Forgot password?
+                  {t('auth.forgotPassword')}
                 </button>
               </div>
               <div className="relative">
@@ -136,22 +133,22 @@ export function LoginPage() {
               {loading ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Signing in…
+                  {t('auth.signingIn')}
                 </span>
               ) : (
-                <>Sign In <ArrowRight size={14} /></>
+                <>{t('auth.signIn')} <ArrowRight size={14} /></>
               )}
             </button>
           </form>
         </div>
 
         <p className="text-center text-sm text-slate-400 mt-5">
-          Have an invitation?{' '}
+          {t('auth.haveInvite')}{' '}
           <Link
             to="/register"
             className="text-indigo-500 hover:text-indigo-700 font-semibold transition-colors"
           >
-            Create account
+            {t('auth.createAccount')}
           </Link>
         </p>
 

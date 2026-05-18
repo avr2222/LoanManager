@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { Loan, LoanStatus } from '@/types';
 import { useLoans } from '@/context/LoanContext';
 import { usePayments } from '@/context/PaymentContext';
@@ -13,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 type RoleFilter = 'MyLoans' | 'All' | 'Lender' | 'Borrower' | 'Mediator';
 
 export function LoansPage() {
+  const { t } = useTranslation();
   const { loans, addLoan, updateLoan, deleteLoan, setLoanStatus } = useLoans();
   const { isAdmin, hasFullAccess, userPhone, displayName, phone, adminPhone, user } = useAuth();
   const { deletePaymentsByLoan } = usePayments();
@@ -44,9 +46,9 @@ export function LoansPage() {
     try {
       const added = await addLoan(loan);
       setShowForm(false);
-      showSuccess(`Loan ${added.loanId} added for ${added.borrowerName}`);
+      showSuccess(t('loans.addSuccess', { id: added.loanId, name: added.borrowerName }));
     } catch {
-      showError('Failed to add loan');
+      showError(t('loans.addFailed'));
     }
   }
 
@@ -54,9 +56,9 @@ export function LoansPage() {
     try {
       await updateLoan(loan);
       setEditingLoan(undefined);
-      showSuccess('Loan updated successfully');
+      showSuccess(t('loans.updateSuccess'));
     } catch {
-      showError('Failed to update loan');
+      showError(t('loans.updateFailed'));
     }
   }
 
@@ -66,18 +68,18 @@ export function LoansPage() {
       await deletePaymentsByLoan(deletingLoanId);
       await deleteLoan(deletingLoanId);
       setDeletingLoanId(null);
-      showSuccess('Loan deleted');
+      showSuccess(t('loans.deleteSuccess'));
     } catch {
-      showError('Failed to delete loan');
+      showError(t('loans.deleteFailed'));
     }
   }
 
   async function handleSetStatus(loanId: string, status: LoanStatus) {
     try {
       await setLoanStatus(loanId, status);
-      showSuccess(`Loan marked as ${status}`);
+      showSuccess(t('loans.statusSuccess', { status }));
     } catch {
-      showError('Failed to update status');
+      showError(t('loans.statusFailed'));
     }
   }
 
@@ -123,9 +125,9 @@ export function LoansPage() {
       {/* Summary strip */}
       <div className="grid grid-cols-3 gap-2 md:gap-3 mb-5">
         {[
-          { label: 'Total Loans',  value: roleFilteredLoans.length,                                             accent: 'from-slate-50  to-white',       dot: 'bg-slate-300'   },
-          { label: 'Active',       value: roleFilteredLoans.filter((l) => l.loanStatus === 'Active').length,    accent: 'from-emerald-50 to-white',      dot: 'bg-emerald-400' },
-          { label: 'Closed / Other', value: roleFilteredLoans.filter((l) => l.loanStatus !== 'Active').length, accent: 'from-slate-50  to-white',       dot: 'bg-slate-300'   },
+          { label: t('loans.totalLoans'),  value: roleFilteredLoans.length,                                             accent: 'from-slate-50  to-white',       dot: 'bg-slate-300'   },
+          { label: t('loans.active'),       value: roleFilteredLoans.filter((l) => l.loanStatus === 'Active').length,    accent: 'from-emerald-50 to-white',      dot: 'bg-emerald-400' },
+          { label: t('loans.closedOther'), value: roleFilteredLoans.filter((l) => l.loanStatus !== 'Active').length, accent: 'from-slate-50  to-white',       dot: 'bg-slate-300'   },
         ].map(({ label, value, accent, dot }) => (
           <div key={label} className={`bg-gradient-to-br ${accent} rounded-2xl border border-slate-200/60 shadow-sm px-3 md:px-5 py-3 md:py-4`}>
             <div className="flex items-center gap-1.5 mb-1.5">
@@ -140,13 +142,13 @@ export function LoansPage() {
       {/* Lender selector — admin only */}
       {isAdmin && knownLenders.length > 1 && (
         <div className="flex items-center gap-2 mb-3">
-          <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest shrink-0">Lender</label>
+          <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest shrink-0">{t('loans.lenderLabel')}</label>
           <select
             value={lenderFilter}
             onChange={(e) => setLenderFilter(e.target.value)}
             className="text-sm border border-slate-200 rounded-xl px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
           >
-            <option value="">All Lenders ({loans.length})</option>
+            <option value="">{t('loans.allLenders', { count: loans.length })}</option>
             {knownLenders.map(({ phone, name }) => (
               <option key={phone} value={phone}>
                 {name} — {phone}
@@ -158,7 +160,7 @@ export function LoansPage() {
               onClick={() => setLenderFilter('')}
               className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors"
             >
-              Clear
+              {t('loans.clearFilter')}
             </button>
           )}
         </div>
@@ -177,7 +179,7 @@ export function LoansPage() {
             }`}
             style={roleFilter === r ? { background: 'linear-gradient(135deg, #6366f1, #4f46e5)' } : {}}
           >
-            {r === 'MyLoans' ? 'My Loans' : r === 'All' ? 'All Loans' : `As ${r}`}
+            {r === 'MyLoans' ? t('loans.myLoans') : r === 'All' ? t('loans.allLoans') : r === 'Lender' ? t('loans.asLender') : r === 'Borrower' ? t('loans.asBorrower') : t('loans.asMediator')}
           </button>
         ))}
       </div>
@@ -197,7 +199,7 @@ export function LoansPage() {
 
       {/* Add Modal */}
       {showForm && (
-        <Modal title="Add New Loan" onClose={() => setShowForm(false)} size="xl">
+        <Modal title={t('loans.addLoan')} onClose={() => setShowForm(false)} size="xl">
           <LoanForm
             onSubmit={handleAdd}
             onCancel={() => setShowForm(false)}
@@ -223,8 +225,8 @@ export function LoansPage() {
       {/* Delete Confirm */}
       {deletingLoanId && deletingLoan && (
         <ConfirmDialog
-          title="Delete Loan?"
-          message={`This will permanently delete the loan for ${deletingLoan.borrowerName} (${deletingLoanId}) and all associated payment records.`}
+          title={t('loans.deleteLoan')}
+          message={t('loans.deleteMessage', { name: deletingLoan.borrowerName, id: deletingLoanId })}
           confirmLabel="Delete"
           danger
           onConfirm={handleDelete}

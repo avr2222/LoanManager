@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Plus, FileText, ArrowRight, ChevronDown, ChevronUp, CheckCircle2, Users, X, Pencil, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -62,6 +63,7 @@ interface BorrowerGroup {
 }
 
 export function MediatorDashboardPage() {
+  const { t } = useTranslation();
   const { loans, updateLoan, deleteLoan } = useLoans();
   const { payments, updatePayment, deletePaymentsByLoan } = usePayments();
   const { userPhone, hasFullAccess, isAdmin, profile, phone: profilePhone, adminPhone } = useAuth();
@@ -334,7 +336,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
   }
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
+    <>
+    <div className="xl:grid xl:grid-cols-[1fr_380px] xl:gap-6 xl:items-start">
+    <div className="space-y-4 min-w-0 xl:col-start-1 xl:row-start-1">
 
       {/* View-as banner */}
       {isViewAs && (
@@ -394,28 +398,28 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
       {/* ── Admin system-wide overview — only when admin has no personal loans ── */}
       {isAdmin && !isViewAs && adminStats && !hasLender && !hasBorrower && !hasMediator && (
         <div>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">System Overview</p>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">{t('dashboard.systemOverview')}</p>
           <div className="grid grid-cols-2 gap-3">
             <KpiCard
-              label="Active Loans"
+              label={t('dashboard.activeLoans')}
               value={String(adminStats.totalLoans)}
               sub={adminStats.closedLoans > 0 ? `${adminStats.closedLoans} closed` : `${loans.length} total`}
             />
             <KpiCard
-              label="Total Principal"
+              label={t('dashboard.totalPrincipal')}
               value={formatCurrency(adminStats.totalPrincipal)}
               color="indigo"
             />
             <KpiCard
-              label="Total Mthly Due"
+              label={t('dashboard.totalMthlyDue')}
               value={formatCurrency(adminStats.monthlyExpected)}
               color="green"
             />
             <KpiCard
-              label="Overdue"
+              label={t('dashboard.overdue')}
               value={String(adminStats.totalOverdue)}
               color="red"
-              sub={adminStats.totalOverdue > 0 ? 'loans overdue' : 'all on time'}
+              sub={adminStats.totalOverdue > 0 ? t('payments.loansOverdue') : t('payments.allOnTime')}
             />
           </div>
         </div>
@@ -424,35 +428,33 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
       {/* ── KPI cards — one row per role ── */}
       {hasBorrower && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <KpiCard label="Loans Taken"    value={String(borrowerLoans.length)} />
-          <KpiCard label="Total Borrowed" value={formatCurrency(totalBorrowed)}  color="indigo" />
-          <KpiCard label="Monthly Pay"    value={formatCurrency(totalMonthlyDue)} color="red" />
+          <KpiCard label={t('dashboard.loansTaken')}    value={String(borrowerLoans.length)} />
+          <KpiCard label={t('dashboard.totalBorrowed')} value={formatCurrency(totalBorrowed)}  color="indigo" />
+          <KpiCard label={t('dashboard.monthlyDue')}    value={formatCurrency(totalMonthlyDue)} color="red" />
         </div>
       )}
 
       {hasLender && !hasMediator && !hasBorrower ? (
-        // Lender only: 2×2 grid — no orphaned card on mobile
         <div className="grid grid-cols-2 gap-3">
-          <KpiCard label="Loans Given"  value={String(lenderLoans.length)}
-            sub={`${lenderByBorrower.length} borrowers`} />
-          <KpiCard label="Total Lent"   value={formatCurrency(totalLentPrincipal)} color="indigo" />
-          <KpiCard label="Monthly Earn" value={formatCurrency(monthlyLendIncome)}  color="green" />
-          <KpiCard label="Overdue"      value={String(overdueCount)} color="red"
-            sub={overdueCount > 0 ? 'payments late' : 'all on time'} />
+          <KpiCard label={t('dashboard.loansGiven')}  value={String(lenderLoans.length)}
+            sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} />
+          <KpiCard label={t('dashboard.totalLent')}   value={formatCurrency(totalLentPrincipal)} color="indigo" />
+          <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" />
+          <KpiCard label={t('dashboard.overdue')}     value={String(overdueCount)} color="red"
+            sub={overdueCount > 0 ? t('dashboard.paymentsLate') : t('dashboard.allOnTime')} />
         </div>
       ) : hasLender ? (
-        // Lender with other roles: 3-card row + separate net/overdue below
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <KpiCard label="Loans Given"  value={String(lenderLoans.length)}
-              sub={`${lenderByBorrower.length} borrowers`} />
-            <KpiCard label="Total Lent"   value={formatCurrency(totalLentPrincipal)} color="indigo" />
-            <KpiCard label="Monthly Earn" value={formatCurrency(monthlyLendIncome)}  color="green" />
+            <KpiCard label={t('dashboard.loansGiven')}  value={String(lenderLoans.length)}
+              sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} />
+            <KpiCard label={t('dashboard.totalLent')}   value={formatCurrency(totalLentPrincipal)} color="indigo" />
+            <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" />
           </div>
           {!hasMediator && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <KpiCard
-                label={hasBorrower ? 'Net / Month' : 'Overdue'}
+                label={hasBorrower ? t('dashboard.netPerMonth') : t('dashboard.overdue')}
                 value={hasBorrower
                   ? `${netMonthly >= 0 ? '+' : ''}${formatCurrency(netMonthly)}`
                   : String(overdueCount)}
@@ -466,12 +468,12 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
 
       {hasMediator && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Loans Mediated"     value={String(mediatorLoans.length)}
-            sub={`${mediatorByBorrower.length} borrowers`} />
-          <KpiCard label="Mediated Principal" value={formatCurrency(totalMediatedPrincipal)} color="indigo" />
-          <KpiCard label="Commission / mo"    value={formatCurrency(monthlyCommission)}      color="green" />
+          <KpiCard label={t('dashboard.loansMediated')}     value={String(mediatorLoans.length)}
+            sub={t('dashboard.borrowers', { count: mediatorByBorrower.length })} />
+          <KpiCard label={t('dashboard.mediatedPrincipal')} value={formatCurrency(totalMediatedPrincipal)} color="indigo" />
+          <KpiCard label={t('dashboard.commission')}        value={formatCurrency(monthlyCommission)}      color="green" />
           <KpiCard
-            label={hasBorrower ? 'Net / Month' : 'Overdue'}
+            label={hasBorrower ? t('dashboard.netPerMonth') : t('dashboard.overdue')}
             value={hasBorrower
               ? `${netMonthly >= 0 ? '+' : ''}${formatCurrency(netMonthly)}`
               : String(overdueCount)}
@@ -484,7 +486,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
       {!hasLender && !hasMediator && hasBorrower && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <KpiCard
-            label="Overdue"
+            label={t('dashboard.overdue')}
             value={String(overdueCount)}
             color="red"
           />
@@ -582,6 +584,11 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         </div>
       )}
 
+    </div>
+
+    {/* RIGHT column — payment alerts */}
+    <div className="space-y-4 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-4">
+
       {/* ── Pending Verification (borrower claimed, lender to confirm) ── */}
       {claimedPayments.length > 0 && (
         <div className="bg-white rounded-2xl border border-violet-100 overflow-hidden">
@@ -590,7 +597,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-violet-500" />
               <p className="text-xs font-semibold text-violet-700 uppercase tracking-widest">
-                {lenderLoanIds.size > 0 ? 'Pending Verification' : 'Awaiting Confirmation'}
+                {lenderLoanIds.size > 0 ? t('payments.pendingVerification') : t('payments.awaitingConfirmation')}
               </p>
             </div>
             <span className="text-xs font-bold text-white bg-violet-500 px-2 py-0.5 rounded-full">
@@ -673,7 +680,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             style={{ background: 'linear-gradient(135deg, #fef2f2, #fff)' }}>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <p className="text-xs font-semibold text-red-700 uppercase tracking-widest">Overdue Payments</p>
+              <p className="text-xs font-semibold text-red-700 uppercase tracking-widest">{t('payments.overduePayments')}</p>
             </div>
             <span className="text-xs font-bold text-white bg-red-500 px-2 py-0.5 rounded-full">
               {overduePayments.length}
@@ -770,7 +777,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                       {hasFullAccess && lenderLoanIds.has(p.loanId) && (
                         <button onClick={() => handleMarkReceived(p.id)}
                           className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
-                          <CheckCircle2 size={13} /> Mark Received
+                          <CheckCircle2 size={13} /> {t('payments.markReceived')}
                         </button>
                       )}
                     </div>
@@ -789,7 +796,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             style={{ background: 'linear-gradient(135deg, #fffbeb, #fff)' }}>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-amber-400" />
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">Upcoming Payments</p>
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">{t('payments.upcomingPayments')}</p>
             </div>
             <span className="text-xs font-bold text-white bg-amber-500 px-2 py-0.5 rounded-full">
               {upcomingPayments.length}
@@ -860,7 +867,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                       {hasFullAccess && lenderLoanIds.has(p.loanId) && (
                         <button onClick={() => handleMarkReceived(p.id)}
                           className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
-                          <CheckCircle2 size={13} /> Mark Received
+                          <CheckCircle2 size={13} /> {t('payments.markReceived')}
                         </button>
                       )}
                     </div>
@@ -871,6 +878,11 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
           </table>
         </div>
       )}
+
+    </div>
+
+    {/* LEFT column bottom — loan tables */}
+    <div className="space-y-4 min-w-0 xl:col-start-1 xl:row-start-2">
 
       {/* ── My Loans (as borrower) ── */}
       {hasBorrower && (() => {
@@ -995,7 +1007,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
       {hasLender && (
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-50 flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Loans I Gave</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">{t('dashboard.loansGave')}</p>
             <div className="flex items-center gap-4 text-xs text-slate-500">
               <span>Total: <span className="font-semibold text-indigo-600">{formatCurrency(totalLentPrincipal)}</span></span>
               <span>Income: <span className="font-semibold text-emerald-600">{formatCurrency(monthlyLendIncome)}/mo</span></span>
@@ -1105,7 +1117,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
       {hasMediator && (
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-50 flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Loans I Mediated</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">{t('dashboard.loansMediate')}</p>
             <div className="flex items-center gap-4 text-xs text-slate-500">
               <span>Principal: <span className="font-semibold text-indigo-600">{formatCurrency(totalMediatedPrincipal)}</span></span>
               <span>Commission: <span className="font-semibold text-emerald-600">{formatCurrency(monthlyCommission)}/mo</span></span>
@@ -1155,7 +1167,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
           <table className="hidden md:table min-w-full">
             <thead>
               <tr className="border-b border-slate-50">
-                {['Loan Flow (Lender → Borrower)', 'Loan', 'Principal', 'Monthly Interest', 'My Share / mo', 'Status'].map((h) => (
+                {[`${t('loans.lender')} → ${t('loans.borrower')}`, t('loans.loanId'), t('loans.principal'), t('loans.monthly'), `${t('dashboard.commission').replace('/ mo', '')}/ mo`, t('loans.status')].map((h) => (
                   <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -1218,7 +1230,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
 
       {!hasBorrower && !hasMediator && !hasLender && (
         <div className="bg-white rounded-2xl border border-slate-100 flex flex-col items-center justify-center py-16 gap-3">
-          <p className="text-sm text-slate-400">No loans found for your phone number</p>
+          <p className="text-sm text-slate-400">{t('dashboard.noLoansFound')}</p>
           <button
             onClick={() => navigate('/add-loan')}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-500 rounded-lg hover:bg-indigo-600"
@@ -1227,6 +1239,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
           </button>
         </div>
       )}
+
+    </div>
+    </div>
 
       <div className="h-4" />
 
@@ -1284,6 +1299,6 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
           onCancel={() => setDeletingLoanId(null)}
         />
       )}
-    </div>
+    </>
   );
 }

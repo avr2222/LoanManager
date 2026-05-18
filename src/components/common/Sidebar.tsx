@@ -1,22 +1,24 @@
 import { NavLink, Link } from 'react-router-dom';
 import { LayoutDashboard, CreditCard, BarChart3, Upload, HandCoins, User, Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 
-const commonNav = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/loans',     icon: CreditCard,      label: 'Loans' },
-  { to: '/payments',  icon: BarChart3,        label: 'Payments' },
-];
-
-const adminOnlyNav = [
-  { to: '/users',  icon: Users,  label: 'Users' },
-  { to: '/import', icon: Upload, label: 'Import / Export' },
-];
-
 export function Sidebar() {
+  const { t } = useTranslation();
   const { isAdmin, displayName } = useAuth();
+
+  const commonNav = [
+    { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: '/loans',     icon: CreditCard,      label: t('nav.loans') },
+    { to: '/payments',  icon: BarChart3,        label: t('nav.payments') },
+  ];
+  const adminOnlyNav = [
+    { to: '/users',  icon: Users,  label: t('nav.users') },
+    { to: '/import', icon: Upload, label: t('nav.import') },
+  ];
+
   const navItems = isAdmin ? [...commonNav, ...adminOnlyNav] : commonNav;
-  const roleLabel = isAdmin ? 'Admin' : 'Member';
+  const roleLabel = isAdmin ? t('nav.admin') : t('nav.member');
   const initials = displayName.split(' ').map((w) => w[0]?.toUpperCase() ?? '').slice(0, 2).join('');
 
   return (
@@ -33,14 +35,14 @@ export function Sidebar() {
           <HandCoins size={15} className="text-white" />
         </div>
         <div>
-          <div className="font-semibold text-sm text-white leading-tight tracking-tight">Loan Book</div>
+          <div className="font-semibold text-sm text-white leading-tight tracking-tight">{t('nav.loanBook')}</div>
           <div className="text-[11px] text-slate-500 mt-0.5 font-medium">{roleLabel}</div>
         </div>
       </Link>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mb-2">Menu</p>
+        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mb-2">{t('nav.menu')}</p>
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

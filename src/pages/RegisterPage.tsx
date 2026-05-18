@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { HandCoins, UserPlus, Eye, EyeOff, CheckCircle, ArrowRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 
 export function RegisterPage() {
+  const { t } = useTranslation();
   const { signUp, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -36,7 +38,7 @@ export function RegisterPage() {
       if (error || !data?.length) return;
       const invite = data[0] as { phone: string; is_valid: boolean };
       if (!invite.is_valid) {
-        setError('This invitation link has expired or already been used.');
+        setError(t('auth.inviteExpired'));
         return;
       }
       if (invite.phone) {
@@ -45,15 +47,15 @@ export function RegisterPage() {
       }
     }
     checkInvite();
-  }, [inviteToken]);
+  }, [inviteToken, t]);
 
   function validate(): string | null {
-    if (!inviteToken)                      return 'An invitation link is required to register.';
-    if (!name.trim())                      return 'Enter your full name';
-    if (!email.trim() || !email.includes('@')) return 'Enter a valid email address';
-    if (phone.replace(/\D/g, '').length !== 10) return 'Enter a valid 10-digit phone number';
-    if (password.length < 8)               return 'Password must be at least 8 characters';
-    if (password !== confirmPassword)      return 'Passwords do not match';
+    if (!inviteToken)                               return t('auth.inviteRequired2');
+    if (!name.trim())                               return 'Enter your full name';
+    if (!email.trim() || !email.includes('@'))      return 'Enter a valid email address';
+    if (phone.replace(/\D/g, '').length !== 10)     return 'Enter a valid 10-digit phone number';
+    if (password.length < 8)                        return 'Password must be at least 8 characters';
+    if (password !== confirmPassword)               return 'Passwords do not match';
     return null;
   }
 
@@ -92,16 +94,14 @@ export function RegisterPage() {
             style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
             <CheckCircle size={28} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">Account Created!</h1>
-          <p className="text-sm text-slate-400 mb-7">
-            Your account is ready. Sign in to get started.
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">{t('auth.accountCreated')}</h1>
+          <p className="text-sm text-slate-400 mb-7">{t('auth.accountReady')}</p>
           <Link
             to={`/login?email=${encodeURIComponent(email)}`}
             className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white rounded-xl shadow-md shadow-indigo-500/20 hover:shadow-lg hover:-translate-y-0.5 transition-all"
             style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
           >
-            Sign In <ArrowRight size={14} />
+            {t('auth.signIn')} <ArrowRight size={14} />
           </Link>
         </div>
       </div>
@@ -119,22 +119,21 @@ export function RegisterPage() {
 
       <div className="w-full max-w-sm relative z-10">
 
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5 shadow-xl shadow-indigo-500/20"
             style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}>
             <HandCoins size={24} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Create Account</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{t('auth.createAccountTitle')}</h1>
           <p className="text-slate-400 text-sm mt-1.5">
-            {inviteToken ? 'You have been invited to Loan Book' : 'Register to get started'}
+            {inviteToken ? t('auth.inviteSubtitle') : t('auth.registerSubtitle')}
           </p>
         </div>
 
         {!inviteToken && (
           <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs px-4 py-3 rounded-xl mb-4 flex items-start gap-2">
             <span className="mt-0.5 shrink-0">⚠</span>
-            Registration requires an invitation link. Contact the person who invited you.
+            {t('auth.inviteRequired')}
           </div>
         )}
 
@@ -142,7 +141,7 @@ export function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Full Name</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">{t('auth.fullName')}</label>
               <input
                 type="text"
                 autoComplete="name"
@@ -155,7 +154,7 @@ export function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Email</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">{t('auth.email')}</label>
               <input
                 type="email"
                 autoComplete="email"
@@ -167,7 +166,7 @@ export function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Mobile Number</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">{t('auth.mobileNumber')}</label>
               <input
                 type="tel"
                 autoComplete="tel"
@@ -178,19 +177,19 @@ export function RegisterPage() {
                 className={`${inputClass} ${phoneLocked ? 'cursor-not-allowed text-slate-400' : ''}`}
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                {phoneLocked ? 'Phone number is set by your invitation' : 'Used to link you to loans you are part of'}
+                {phoneLocked ? t('auth.phoneFromInvite') : t('auth.phoneHint')}
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Password</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">{t('auth.password')}</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                  placeholder="At least 8 characters"
+                  placeholder={t('auth.passwordMin')}
                   className={`${inputClass} pr-10`}
                 />
                 <button
@@ -204,7 +203,7 @@ export function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Confirm Password</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">{t('auth.confirmPassword')}</label>
               <input
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
@@ -231,22 +230,22 @@ export function RegisterPage() {
               {loading ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Creating account…
+                  {t('auth.creatingAccount')}
                 </span>
               ) : (
-                <><UserPlus size={14} /> Create Account</>
+                <><UserPlus size={14} /> {t('auth.createAccountTitle')}</>
               )}
             </button>
           </form>
         </div>
 
         <p className="text-center text-sm text-slate-400 mt-5">
-          Already have an account?{' '}
+          {t('auth.alreadyHaveAccount')}{' '}
           <Link
             to="/login"
             className="text-indigo-500 hover:text-indigo-700 font-semibold transition-colors"
           >
-            Sign in
+            {t('auth.signInLink')}
           </Link>
         </p>
 

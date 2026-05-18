@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Download, Upload, LogOut, User, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { loansService } from '@/services/supabaseService';
 import { profilesService } from '@/services/profilesService';
 import { useToast } from './Toast';
-import { useRef } from 'react';
 
 interface TopbarProps { title: string; }
 
 export function Topbar({ title }: TopbarProps) {
+  const { t } = useTranslation();
   const { importFile, exportData } = useApp();
   const { user, signOut, isAdmin, displayName, adminPhone, updateProfile, profile } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -26,9 +27,9 @@ export function Topbar({ title }: TopbarProps) {
     if (!file) return;
     try {
       await importFile(file);
-      showSuccess('Imported successfully');
+      showSuccess(t('app.importSuccess'));
     } catch (err) {
-      showError('Import failed — check file format');
+      showError(t('app.importFailed'));
       console.error(err);
     }
     e.target.value = '';
@@ -56,7 +57,7 @@ export function Topbar({ title }: TopbarProps) {
       profilesService.updateProfile(user.id, { upiId: upiInput.trim() }).catch(console.warn);
     }
     setSaving(false);
-    showSuccess('Profile updated');
+    showSuccess(t('profile.updateSuccess'));
     setShowProfile(false);
   }
 
@@ -81,22 +82,22 @@ export function Topbar({ title }: TopbarProps) {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all"
               >
                 <Upload size={13} />
-                <span className="hidden sm:inline">Import</span>
+                <span className="hidden sm:inline">{t('topbar.import')}</span>
               </button>
               <button
-                onClick={() => { exportData(); showSuccess('Exported!'); }}
+                onClick={() => { exportData(); showSuccess(t('app.exportSuccess')); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all"
                 style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
               >
                 <Download size={13} />
-                <span className="hidden sm:inline">Export</span>
+                <span className="hidden sm:inline">{t('topbar.export')}</span>
               </button>
             </>
           )}
 
           <button
             onClick={openProfile}
-            title="Edit profile"
+            title={t('topbar.editProfile')}
             className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold hover:ring-2 hover:ring-indigo-300 hover:ring-offset-1 transition-all ml-1 shadow-sm"
             style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff' }}
           >
@@ -106,7 +107,7 @@ export function Topbar({ title }: TopbarProps) {
           <button
             onClick={signOut}
             className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-            title="Sign out"
+            title={t('topbar.signOut')}
           >
             <LogOut size={15} />
           </button>
@@ -120,7 +121,7 @@ export function Topbar({ title }: TopbarProps) {
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowProfile(false)} />
             <div className="relative bg-white rounded-2xl shadow-2xl shadow-black/10 w-full max-w-sm z-10 border border-slate-100">
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                <h2 className="text-sm font-semibold text-slate-800 tracking-tight">Edit Profile</h2>
+                <h2 className="text-sm font-semibold text-slate-800 tracking-tight">{t('profile.editProfile')}</h2>
                 <button onClick={() => setShowProfile(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors">
                   <X size={16} />
                 </button>
@@ -135,49 +136,49 @@ export function Topbar({ title }: TopbarProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Display Name</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">{t('profile.displayName')}</label>
                   <input
                     type="text"
                     value={nameInput}
                     onChange={(e) => setNameInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSaveProfile()}
-                    placeholder="Your full name"
+                    placeholder={t('profile.namePlaceholder')}
                     className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 placeholder:text-slate-300 transition-all"
                     autoFocus
                   />
                   {!isAdmin && (
-                    <p className="text-xs text-slate-400 mt-1">Shown to admin in the Users list</p>
+                    <p className="text-xs text-slate-400 mt-1">{t('profile.shownToAdmin')}</p>
                   )}
                 </div>
 
                 {isAdmin && (
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Phone Number</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">{t('profile.phoneNumber')}</label>
                     <input
                       type="tel"
                       value={phoneInput}
                       onChange={(e) => setPhoneInput(e.target.value)}
-                      placeholder="10-digit mobile number"
+                      placeholder={t('profile.phonePlaceholder')}
                       className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 placeholder:text-slate-300 transition-all"
                     />
-                    <p className="text-xs text-slate-400 mt-1">Used to match loans where you are the lender</p>
+                    <p className="text-xs text-slate-400 mt-1">{t('profile.phoneHint')}</p>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1.5">UPI ID</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">{t('profile.upiId')}</label>
                   <input
                     type="text"
                     value={upiInput}
                     onChange={(e) => setUpiInput(e.target.value)}
-                    placeholder="yourname@upi"
+                    placeholder={t('profile.upiPlaceholder')}
                     className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 placeholder:text-slate-300 transition-all"
                   />
-                  <p className="text-xs text-slate-400 mt-1">Borrowers can pay you directly via any UPI app</p>
+                  <p className="text-xs text-slate-400 mt-1">{t('profile.upiHint')}</p>
                 </div>
 
                 <div className="bg-slate-50 rounded-xl px-3.5 py-2.5">
-                  <p className="text-[11px] font-medium text-slate-400 mb-0.5">Account</p>
+                  <p className="text-[11px] font-medium text-slate-400 mb-0.5">{t('profile.account')}</p>
                   <p className="text-sm text-slate-700 font-medium">{user?.email}</p>
                 </div>
 
@@ -186,7 +187,7 @@ export function Topbar({ title }: TopbarProps) {
                     onClick={() => setShowProfile(false)}
                     className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
                   >
-                    Cancel
+                    {t('profile.cancel')}
                   </button>
                   <button
                     onClick={handleSaveProfile}
@@ -194,7 +195,7 @@ export function Topbar({ title }: TopbarProps) {
                     className="flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-xl hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none transition-all"
                     style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
                   >
-                    {saving ? 'Saving…' : 'Save'}
+                    {saving ? t('profile.saving') : t('profile.save')}
                   </button>
                 </div>
               </div>
