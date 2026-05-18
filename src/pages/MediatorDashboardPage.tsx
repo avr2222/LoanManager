@@ -42,12 +42,20 @@ const kpiColorMap: Record<KpiColor, string> = {
   green:   'text-emerald-600',
   red:     'text-red-500',
 };
-function KpiCard({ label, value, color = 'default', sub }: { label: string; value: string; color?: KpiColor; sub?: string }) {
+const kpiBgMap: Record<KpiColor, string> = {
+  default: 'bg-slate-50 border-slate-200/60',
+  indigo:  'bg-indigo-50 border-indigo-100',
+  green:   'bg-emerald-50 border-emerald-100',
+  red:     'bg-red-50 border-red-100',
+};
+function KpiCard({ label, value, color = 'default', sub, wide }: { label: string; value: string; color?: KpiColor; sub?: string; wide?: boolean }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 px-4 py-4">
-      <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight">{label}</p>
-      <p className={`text-xl font-bold mt-1.5 ${kpiColorMap[color]}`}>{value}</p>
-      {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+    <div className={`rounded-2xl border px-4 py-4 ${wide ? `${kpiBgMap[color]} flex sm:block items-center justify-between gap-3` : 'bg-white border-slate-100'}`}>
+      <div>
+        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight">{label}</p>
+        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+      </div>
+      <p className={`font-bold shrink-0 ${kpiColorMap[color]} ${wide ? 'text-2xl sm:mt-1.5' : 'text-xl mt-1.5'}`}>{value}</p>
     </div>
   );
 }
@@ -431,7 +439,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
           <KpiCard label={t('dashboard.loansTaken')}    value={String(borrowerLoans.length)} />
           <KpiCard label={t('dashboard.totalBorrowed')} value={formatCurrency(totalBorrowed)}  color="indigo" />
           <div className="col-span-2 sm:col-span-1">
-            <KpiCard label={t('dashboard.monthlyDue')} value={formatCurrency(totalMonthlyDue)} color="red" />
+            <KpiCard label={t('dashboard.monthlyDue')} value={formatCurrency(totalMonthlyDue)} color="red" wide />
           </div>
         </div>
       )}
@@ -452,7 +460,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} />
             <KpiCard label={t('dashboard.totalLent')}   value={formatCurrency(totalLentPrincipal)} color="indigo" />
             <div className="col-span-2 sm:col-span-1">
-              <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" />
+              <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" wide />
             </div>
           </div>
           {!hasMediator && (
@@ -465,6 +473,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                     : String(overdueCount)}
                   color={hasBorrower ? (netMonthly >= 0 ? 'green' : 'red') : 'red'}
                   sub={hasBorrower ? `${overdueCount} overdue` : undefined}
+                  wide
                 />
               </div>
             </div>
@@ -496,6 +505,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               label={t('dashboard.overdue')}
               value={String(overdueCount)}
               color="red"
+              wide
             />
           </div>
         </div>
