@@ -605,8 +605,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             </span>
           </div>
 
-          {/* Mobile */}
-          <div className="md:hidden divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50">
             {claimedPayments.map((p) => (
               <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
                 <div>
@@ -615,6 +614,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                   <p className="text-xs text-violet-600 mt-0.5">{p.monthYear} · {p.dueDate}</p>
                   {p.remarks && p.remarks.includes('UTR:') && (
                     <p className="text-xs text-slate-400 mt-0.5">{p.remarks.slice(p.remarks.indexOf('UTR:'))}</p>
+                  )}
+                  {borrowerLoanIds.has(p.loanId) && (
+                    <p className="text-xs text-violet-500 mt-0.5">Awaiting lender</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
@@ -632,44 +634,6 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               </div>
             ))}
           </div>
-
-          {/* Desktop */}
-          <table className="hidden md:table min-w-full">
-            <thead>
-              <tr className="border-b border-violet-50">
-                {['Loan', 'Borrower', 'Month', 'Due Date', 'Amount', 'UTR / Note', ''].map((h) => (
-                  <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {claimedPayments.map((p) => (
-                <tr key={p.id} className="border-t border-violet-50 hover:bg-violet-50/20">
-                  <td className="px-5 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
-                  <td className="px-5 py-3 text-sm font-medium text-slate-800">{p.borrowerName}</td>
-                  <td className="px-5 py-3 text-sm text-slate-600">{p.monthYear}</td>
-                  <td className="px-5 py-3 text-sm text-slate-500">{p.dueDate}</td>
-                  <td className="px-5 py-3 text-sm font-semibold text-violet-600">{formatCurrency(p.netAmountExpected)}</td>
-                  <td className="px-5 py-3 text-xs text-slate-400">
-                    {p.remarks?.includes('UTR:')
-                      ? p.remarks.slice(p.remarks.indexOf('UTR:'))
-                      : <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-5 py-3">
-                    {hasFullAccess && lenderLoanIds.has(p.loanId) && (
-                      <button onClick={() => handleVerifyPayment(p.id)}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-white bg-violet-500 hover:bg-violet-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
-                        <CheckCircle2 size={13} /> Verify & Confirm
-                      </button>
-                    )}
-                    {borrowerLoanIds.has(p.loanId) && (
-                      <span className="text-xs text-violet-600 font-medium">Awaiting lender</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
 
@@ -687,17 +651,16 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             </span>
           </div>
 
-          {/* Mobile */}
-          <div className="md:hidden divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50">
             {overduePayments.map((p) => (
               <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</p>
                   <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
-                  {mediatorLoanIds.has(p.loanId) && (
-                    <p className="text-xs text-slate-400">via {loans.find(l => l.loanId === p.loanId)?.lenderName || 'Lender'}</p>
+                  {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
+                    <p className="text-xs text-slate-400 mt-0.5">Lender: {loans.find(l => l.loanId === p.loanId)?.lenderName || '—'}</p>
                   )}
-                  <p className="text-xs text-red-500 font-semibold mt-0.5">{p.daysOverdue} days overdue · Due {p.dueDate}</p>
+                  <p className="text-xs text-red-500 font-semibold mt-0.5">{p.daysOverdue}d overdue · Due {p.dueDate}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {lenderLoanIds.has(p.loanId) && (
@@ -729,63 +692,6 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               </div>
             ))}
           </div>
-
-          {/* Desktop */}
-          <table className="hidden md:table min-w-full">
-            <thead>
-              <tr className="border-b border-red-50">
-                {['Loan', 'Borrower', 'Month', 'Due Date', 'Overdue', 'Amount', ''].map((h) => (
-                  <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {overduePayments.map((p) => (
-                <tr key={p.id} className="border-t border-red-50 hover:bg-red-50/30">
-                  <td className="px-5 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
-                  <td className="px-5 py-3">
-                    <div className="text-sm font-medium text-slate-800">{p.borrowerName}</div>
-                    {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
-                      <div className="text-xs text-slate-400 mt-0.5">
-                        Lender: {loans.find(l => l.loanId === p.loanId)?.lenderName || '—'}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-sm text-slate-600">{p.monthYear}</td>
-                  <td className="px-5 py-3 text-sm text-slate-500">{p.dueDate}</td>
-                  <td className="px-5 py-3">
-                    <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{p.daysOverdue}d late</span>
-                  </td>
-                  <td className="px-5 py-3 text-sm font-semibold text-red-600">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      {lenderLoanIds.has(p.loanId) && (
-                        <WhatsAppButton
-                          phone={loans.find(l => l.loanId === p.loanId)?.borrowerPhone ?? ''}
-                          message={overdueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, daysOverdue: p.daysOverdue, upiId: profile?.upiId ?? undefined })}
-                        />
-                      )}
-                      {mediatorLoanIds.has(p.loanId) && (() => {
-                        const loan = loans.find(l => l.loanId === p.loanId);
-                        return loan?.lenderPhone ? (
-                          <WhatsAppButton
-                            phone={loan.lenderPhone}
-                            message={`Hi ${loan.lenderName || 'there'}, ${p.borrowerName}'s payment for ${p.monthYear} is overdue by ${p.daysOverdue} days (₹${p.netAmountExpected}). Please follow up.`}
-                          />
-                        ) : null;
-                      })()}
-                      {hasFullAccess && lenderLoanIds.has(p.loanId) && (
-                        <button onClick={() => handleMarkReceived(p.id)}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
-                          <CheckCircle2 size={13} /> {t('payments.markReceived')}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
 
@@ -803,8 +709,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             </span>
           </div>
 
-          {/* Mobile */}
-          <div className="md:hidden divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50">
             {upcomingPayments.map((p) => (
               <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
                 <div>
@@ -833,49 +738,6 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               </div>
             ))}
           </div>
-
-          {/* Desktop */}
-          <table className="hidden md:table min-w-full">
-            <thead>
-              <tr className="border-b border-amber-50">
-                {['Loan', 'Borrower', 'Month', 'Due Date', 'Amount', ''].map((h) => (
-                  <th key={h} className="px-5 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {upcomingPayments.map((p) => (
-                <tr key={p.id} className="border-t border-amber-50 hover:bg-amber-50/30">
-                  <td className="px-5 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
-                  <td className="px-5 py-3">
-                    <div className="text-sm font-medium text-slate-800">{p.borrowerName}</div>
-                    {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
-                      <div className="text-xs text-slate-400 mt-0.5">Lender: {loans.find(l => l.loanId === p.loanId)?.lenderName || '—'}</div>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-sm text-slate-600">{p.monthYear}</td>
-                  <td className="px-5 py-3 text-sm text-slate-500">{p.dueDate}</td>
-                  <td className="px-5 py-3 text-sm font-semibold text-slate-800">{formatCurrency(borrowerLoanIds.has(p.loanId) ? p.interestAmount : p.netAmountExpected)}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      {lenderLoanIds.has(p.loanId) && (
-                        <WhatsAppButton
-                          phone={loans.find(l => l.loanId === p.loanId)?.borrowerPhone ?? ''}
-                          message={dueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, dueDate: p.dueDate, upiId: profile?.upiId ?? undefined })}
-                        />
-                      )}
-                      {hasFullAccess && lenderLoanIds.has(p.loanId) && (
-                        <button onClick={() => handleMarkReceived(p.id)}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap">
-                          <CheckCircle2 size={13} /> {t('payments.markReceived')}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
 
