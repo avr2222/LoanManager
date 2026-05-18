@@ -156,7 +156,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
             {mobileItems.map((p) => (
               <div
                 key={p.id}
-                className={`bg-white rounded-2xl border p-4 ${p.daysOverdue > 0 ? 'border-red-200 bg-red-50/40' : 'border-slate-100'}`}
+                className={`bg-white rounded-2xl border p-4 pr-14 md:pr-4 ${p.daysOverdue > 0 ? 'border-red-200 bg-red-50/40' : 'border-slate-100'}`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div>

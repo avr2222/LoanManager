@@ -113,13 +113,13 @@ export function PaymentsPage() {
       {/* Summary — 2 cols on mobile, 4 on md */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
-          { label: 'Total Expected', value: formatCurrency(totalExpected), color: 'text-slate-900' },
-          { label: 'Total Received', value: formatCurrency(totalReceived), color: 'text-emerald-600' },
-          { label: 'Total Pending',  value: formatCurrency(totalPending),  color: 'text-amber-500' },
-          { label: 'Overdue',        value: overdueCount.toString(),        color: 'text-red-500' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5">
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">{label}</p>
+          { label: 'Total Expected', value: formatCurrency(totalExpected), color: 'text-slate-900',    bg: 'from-slate-50 to-white border-slate-200/60' },
+          { label: 'Total Received', value: formatCurrency(totalReceived), color: 'text-emerald-600',  bg: 'from-emerald-50 to-white border-emerald-100' },
+          { label: 'Total Pending',  value: formatCurrency(totalPending),  color: 'text-amber-500',    bg: 'from-amber-50 to-white border-amber-100' },
+          { label: 'Overdue',        value: overdueCount.toString(),        color: 'text-red-500',      bg: 'from-red-50 to-white border-red-100' },
+        ].map(({ label, value, color, bg }) => (
+          <div key={label} className={`bg-gradient-to-br ${bg} rounded-2xl border shadow-sm px-4 py-3.5`}>
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight">{label}</p>
             <p className={`text-xl md:text-2xl font-bold mt-1.5 ${color}`}>{value}</p>
           </div>
         ))}

@@ -167,12 +167,12 @@ export function LoansPage() {
       )}
 
       {/* Role filter chips */}
-      <div className="flex gap-1.5 mb-4 flex-wrap">
+      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
         {(['MyLoans', 'All', ...(myPhone ? ['Lender', 'Borrower', 'Mediator'] : [])] as RoleFilter[]).map((r) => (
           <button
             key={r}
             onClick={() => setRoleFilter(r)}
-            className={`px-3.5 py-1 text-xs font-semibold rounded-full border transition-all ${
+            className={`shrink-0 px-3.5 py-1 text-xs font-semibold rounded-full border transition-all ${
               roleFilter === r
                 ? 'text-white border-transparent shadow-sm shadow-indigo-200'
                 : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-600'

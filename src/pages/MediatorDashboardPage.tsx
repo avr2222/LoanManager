@@ -45,7 +45,7 @@ const kpiColorMap: Record<KpiColor, string> = {
 function KpiCard({ label, value, color = 'default', sub }: { label: string; value: string; color?: KpiColor; sub?: string }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-100 px-4 py-4">
-      <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">{label}</p>
+      <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight">{label}</p>
       <p className={`text-xl font-bold mt-1.5 ${kpiColorMap[color]}`}>{value}</p>
       {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
     </div>
@@ -371,26 +371,26 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
           {!isViewAs && hasFullAccess && (
             <button
               onClick={() => navigate('/add-loan')}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 active:scale-95 transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 active:scale-95 transition-all shadow-sm"
             >
-              <Plus size={16} /> Add Loan
+              <Plus size={15} /> Add Loan
             </button>
           )}
           {isAdmin && !isViewAs && knownUsers.length > 0 && (
             <button
               onClick={() => setShowUserPicker(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors"
             >
-              <Users size={15} /> View as User
+              <Users size={14} /> View as User
             </button>
           )}
         </div>
         {(hasBorrower || hasMediator || hasLender) && (
           <button
             onClick={handleDownloadPDF}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-rose-500 rounded-lg hover:bg-rose-600 active:scale-95 transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-semibold text-white bg-rose-500 rounded-lg hover:bg-rose-600 active:scale-95 transition-all shadow-sm"
           >
-            <FileText size={15} /> Statement
+            <FileText size={14} /> Statement
           </button>
         )}
       </div>
@@ -430,7 +430,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <KpiCard label={t('dashboard.loansTaken')}    value={String(borrowerLoans.length)} />
           <KpiCard label={t('dashboard.totalBorrowed')} value={formatCurrency(totalBorrowed)}  color="indigo" />
-          <KpiCard label={t('dashboard.monthlyDue')}    value={formatCurrency(totalMonthlyDue)} color="red" />
+          <div className="col-span-2 sm:col-span-1">
+            <KpiCard label={t('dashboard.monthlyDue')} value={formatCurrency(totalMonthlyDue)} color="red" />
+          </div>
         </div>
       )}
 
@@ -449,18 +451,22 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             <KpiCard label={t('dashboard.loansGiven')}  value={String(lenderLoans.length)}
               sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} />
             <KpiCard label={t('dashboard.totalLent')}   value={formatCurrency(totalLentPrincipal)} color="indigo" />
-            <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" />
+            <div className="col-span-2 sm:col-span-1">
+              <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" />
+            </div>
           </div>
           {!hasMediator && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <KpiCard
-                label={hasBorrower ? t('dashboard.netPerMonth') : t('dashboard.overdue')}
-                value={hasBorrower
-                  ? `${netMonthly >= 0 ? '+' : ''}${formatCurrency(netMonthly)}`
-                  : String(overdueCount)}
-                color={hasBorrower ? (netMonthly >= 0 ? 'green' : 'red') : 'red'}
-                sub={hasBorrower ? `${overdueCount} overdue` : undefined}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 sm:col-span-1">
+                <KpiCard
+                  label={hasBorrower ? t('dashboard.netPerMonth') : t('dashboard.overdue')}
+                  value={hasBorrower
+                    ? `${netMonthly >= 0 ? '+' : ''}${formatCurrency(netMonthly)}`
+                    : String(overdueCount)}
+                  color={hasBorrower ? (netMonthly >= 0 ? 'green' : 'red') : 'red'}
+                  sub={hasBorrower ? `${overdueCount} overdue` : undefined}
+                />
+              </div>
             </div>
           )}
         </>
@@ -484,12 +490,14 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
       )}
 
       {!hasLender && !hasMediator && hasBorrower && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <KpiCard
-            label={t('dashboard.overdue')}
-            value={String(overdueCount)}
-            color="red"
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 sm:col-span-1">
+            <KpiCard
+              label={t('dashboard.overdue')}
+              value={String(overdueCount)}
+              color="red"
+            />
+          </div>
         </div>
       )}
 
