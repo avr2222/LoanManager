@@ -627,7 +627,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             {claimedPayments.map((p) => (
               <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</p>
+                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
                   <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
                   <p className="text-xs text-violet-600 mt-0.5">{p.monthYear} · {p.dueDate}</p>
                   {p.remarks && p.remarks.includes('UTR:') && (
@@ -673,7 +673,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             {overduePayments.map((p) => (
               <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</p>
+                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
                   <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
                   {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
                     <p className="text-xs text-slate-400 mt-0.5">Lender: {loans.find(l => l.loanId === p.loanId)?.lenderName || '—'}</p>
@@ -731,7 +731,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             {upcomingPayments.map((p) => (
               <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</p>
+                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
                   <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
                   {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
                     <p className="text-xs text-slate-400 mt-0.5">Lender: {loans.find(l => l.loanId === p.loanId)?.lenderName || '—'}</p>
