@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Edit2, Trash2, Plus, Search, ChevronUp, ChevronDown, CheckCircle2 } from 'lucide-react';
 import type { Payment, PaymentStatus } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { EmptyState } from '@/components/common/EmptyState';
 import { formatCurrency, formatDate } from '@/utils/formatUtils';
+
+type FilterValue = PaymentStatus | 'All' | 'Overdue';
 
 interface PaymentTableProps {
   payments: Payment[];
@@ -16,21 +19,33 @@ interface PaymentTableProps {
   ownedLoanIds?: Set<string>;
   /** When false, the Record Payment button is disabled (phone user has no lender loans) */
   canAdd?: boolean;
+  /** Controlled status filter driven by parent (e.g. card clicks) */
+  activeFilter?: FilterValue;
 }
 
 type SortKey = 'monthYear' | 'loanId' | 'borrowerName' | 'netAmountExpected' | 'amountReceived' | 'daysOverdue' | 'paymentStatus';
 
-export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, readOnly, ownedLoanIds, canAdd = true }: PaymentTableProps) {
+export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, readOnly, ownedLoanIds, canAdd = true, activeFilter }: PaymentTableProps) {
+  const navigate = useNavigate();
   // A row is editable if readOnly is false AND (no ownedLoanIds filter, or the payment's loan is owned by the current user)
   const canAct = (p: Payment) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(p.loanId));
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'All'>('All');
+  const [statusFilter, setStatusFilter] = useState<FilterValue>('All');
   const [sortKey, setSortKey] = useState<SortKey>('daysOverdue');
   const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(1);           // desktop pagination
   const [mobilePage, setMobilePage] = useState(1); // mobile infinite scroll
   const PAGE_SIZE = 25;
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Sync external card-click filter into internal state
+  useEffect(() => {
+    if (activeFilter !== undefined) {
+      setStatusFilter(activeFilter);
+      setPage(1);
+      setMobilePage(1);
+    }
+  }, [activeFilter]);
 
   const filtered = payments
     .filter((p) => {
@@ -39,7 +54,10 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
         p.borrowerName.toLowerCase().includes(search.toLowerCase()) ||
         p.loanId.toLowerCase().includes(search.toLowerCase()) ||
         p.monthYear.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = statusFilter === 'All' || p.paymentStatus === statusFilter;
+      const matchStatus =
+        statusFilter === 'All' ? true :
+        statusFilter === 'Overdue' ? (p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived') :
+        p.paymentStatus === statusFilter;
       return matchSearch && matchStatus;
     })
     .sort((a, b) => {
@@ -115,10 +133,11 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value as PaymentStatus | 'All'); setPage(1); setMobilePage(1); }}
+          onChange={(e) => { setStatusFilter(e.target.value as FilterValue); setPage(1); setMobilePage(1); }}
           className="px-2 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none"
         >
           <option value="All">All</option>
+          <option value="Overdue">Overdue</option>
           <option value="Pending">Pending</option>
           <option value="Received">Received</option>
           <option value="Partial">Partial</option>
@@ -160,7 +179,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
               >
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <span className="text-xs font-mono font-semibold text-indigo-500">{p.loanId}</span>
+                    <button onClick={() => navigate(`/loans/${p.loanId}`)} className="text-xs font-mono font-semibold text-indigo-500 hover:underline">{p.loanId}</button>
                     <p className="text-sm font-semibold text-slate-800">{p.borrowerName}</p>
                     <p className="text-xs text-slate-400">{p.monthYear} · Due {formatDate(p.dueDate)}</p>
                   </div>
@@ -239,7 +258,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                 <tbody className="divide-y divide-slate-50">
                   {paged.map((p) => (
                     <tr key={p.id} className={`hover:bg-slate-50/60 transition-colors ${p.daysOverdue > 0 ? 'bg-red-50/40' : ''}`}>
-                      <td className="px-4 py-3 text-xs font-mono font-semibold text-indigo-500">{p.loanId}</td>
+                      <td className="px-4 py-3"><button onClick={() => navigate(`/loans/${p.loanId}`)} className="text-xs font-mono font-semibold text-indigo-500 hover:underline">{p.loanId}</button></td>
                       <td className="px-4 py-3 text-sm text-slate-700">{p.borrowerName}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{p.monthYear}</td>
                       <td className="px-4 py-3 text-sm text-slate-500">{formatDate(p.dueDate)}</td>

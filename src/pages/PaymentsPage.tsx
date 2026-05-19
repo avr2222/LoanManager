@@ -41,6 +41,7 @@ export function PaymentsPage() {
   const [defaultLoanId, setDefaultLoanId] = useState<string | undefined>();
   const [editingPayment, setEditingPayment] = useState<Payment | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'All' | 'Received' | 'Pending' | 'Overdue'>('All');
 
   // Auto-open form when navigated here with a loanId (e.g. from Dashboard "Record" button)
   useEffect(() => {
@@ -110,19 +111,27 @@ export function PaymentsPage() {
 
   return (
     <div>
-      {/* Summary — 2 cols on mobile, 4 on md */}
+      {/* Summary — 2 cols on mobile, 4 on md — clickable to filter */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        {[
-          { label: 'Total Expected', value: formatCurrency(totalExpected), color: 'text-slate-900',    bg: 'from-slate-50 to-white border-slate-200/60' },
-          { label: 'Total Received', value: formatCurrency(totalReceived), color: 'text-emerald-600',  bg: 'from-emerald-50 to-white border-emerald-100' },
-          { label: 'Total Pending',  value: formatCurrency(totalPending),  color: 'text-amber-500',    bg: 'from-amber-50 to-white border-amber-100' },
-          { label: 'Overdue',        value: overdueCount.toString(),        color: 'text-red-500',      bg: 'from-red-50 to-white border-red-100' },
-        ].map(({ label, value, color, bg }) => (
-          <div key={label} className={`bg-gradient-to-br ${bg} rounded-2xl border shadow-sm px-4 py-3.5`}>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight">{label}</p>
-            <p className={`text-xl md:text-2xl font-bold mt-1.5 ${color}`}>{value}</p>
-          </div>
-        ))}
+        {([
+          { label: 'Total Expected', value: formatCurrency(totalExpected), color: 'text-slate-900',   bg: 'from-slate-50 to-white border-slate-200/60', filter: 'All'      as const },
+          { label: 'Total Received', value: formatCurrency(totalReceived), color: 'text-emerald-600', bg: 'from-emerald-50 to-white border-emerald-100', filter: 'Received' as const },
+          { label: 'Total Pending',  value: formatCurrency(totalPending),  color: 'text-amber-500',   bg: 'from-amber-50 to-white border-amber-100',     filter: 'Pending'  as const },
+          { label: 'Overdue',        value: overdueCount.toString(),        color: 'text-red-500',     bg: 'from-red-50 to-white border-red-100',         filter: 'Overdue'  as const },
+        ] as const).map(({ label, value, color, bg, filter }) => {
+          const isActive = activeFilter === filter;
+          return (
+            <button
+              key={label}
+              onClick={() => setActiveFilter(isActive ? 'All' : filter)}
+              className={`text-left bg-gradient-to-br ${bg} rounded-2xl border shadow-sm px-4 py-3.5 w-full transition-all ${isActive ? 'ring-2 ring-indigo-400 shadow-md' : 'hover:shadow-md hover:-translate-y-0.5'}`}
+            >
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight">{label}</p>
+              <p className={`text-xl md:text-2xl font-bold mt-1.5 ${color}`}>{value}</p>
+              {isActive && <p className="text-[10px] text-indigo-400 mt-1 font-medium">Filtered ↑ click to clear</p>}
+            </button>
+          );
+        })}
       </div>
 
       <PaymentTable
@@ -134,6 +143,7 @@ export function PaymentsPage() {
         readOnly={!hasFullAccess}
         ownedLoanIds={ownedLoanIds}
         canAdd={isAdmin || (ownedLoanIds !== undefined && ownedLoanIds.size > 0)}
+        activeFilter={activeFilter}
       />
 
       {/* Floating action button — mobile only */}
