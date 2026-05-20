@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Plus, FileText, ArrowRight, ChevronDown, ChevronUp, CheckCircle2, Users, X, Pencil, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
@@ -80,12 +80,23 @@ export function MediatorDashboardPage() {
   const { profileMap } = useApp();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showClosedLoans, setShowClosedLoans]   = useState(false);
   const [viewAsPhone, setViewAsPhone]           = useState('');
   const [viewAsName, setViewAsName]             = useState('');
   const [showUserPicker, setShowUserPicker]     = useState(false);
   const [editingLoan, setEditingLoan]           = useState<Loan | undefined>();
   const [deletingLoanId, setDeletingLoanId]     = useState<string | null>(null);
+
+  // Clear view-as when the logo link sends resetViewAs signal
+  useEffect(() => {
+    const state = location.state as { resetViewAs?: boolean } | null;
+    if (state?.resetViewAs) {
+      setViewAsPhone('');
+      setViewAsName('');
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
 
   const isViewAs = !!viewAsPhone;
 

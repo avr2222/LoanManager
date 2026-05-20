@@ -55,6 +55,7 @@ export function Sidebar() {
       {/* Logo */}
       <Link
         to="/dashboard"
+        state={{ resetViewAs: true }}
         className="flex items-center gap-3 px-5 py-5 border-b border-white/5 hover:bg-white/5 transition-colors group"
       >
         <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg"
