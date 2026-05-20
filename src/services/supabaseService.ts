@@ -269,9 +269,7 @@ export const paymentsService = {
   },
 
   async upsert(payment: Payment): Promise<void> {
-    const { error } = await supabase
-      .from('payments')
-      .upsert(toDbPayment(payment), { onConflict: 'loan_id,month_year' });
+    const { error } = await supabase.from('payments').upsert(toDbPayment(payment));
     if (error) throw error;
   },
 
