@@ -17,6 +17,8 @@ import { WhatsAppButton } from '@/components/common/WhatsAppButton';
 import { overdueMessage, dueMessage } from '@/utils/whatsappUtils';
 import { exportUserPDF } from '@/services/pdfService';
 import { derivePaymentFields } from '@/services/calculationService';
+import { useApp } from '@/context/AppContext';
+import { resolveProfileName } from '@/utils/profileUtils';
 
 function norm(phone: string) {
   return phone.replace(/\D/g, '').slice(-10);
@@ -75,6 +77,7 @@ export function MediatorDashboardPage() {
   const { loans, updateLoan, deleteLoan } = useLoans();
   const { payments, updatePayment, deletePaymentsByLoan } = usePayments();
   const { userPhone, hasFullAccess, isAdmin, profile, phone: profilePhone, adminPhone } = useAuth();
+  const { profileMap } = useApp();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const [showClosedLoans, setShowClosedLoans]   = useState(false);
@@ -638,7 +641,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               <div key={p.id} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
-                  <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
+                  <p className="text-sm font-medium text-slate-800">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</p>
                   <p className="text-xs text-violet-600 mt-0.5">{p.monthYear} · {p.dueDate}</p>
                   {p.remarks && p.remarks.includes('UTR:') && (
                     <p className="text-xs text-slate-400 mt-0.5">{p.remarks.slice(p.remarks.indexOf('UTR:'))}</p>
@@ -684,9 +687,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               <div key={p.id} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
-                  <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
+                  <p className="text-sm font-medium text-slate-800">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</p>
                   {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
-                    <p className="text-xs text-slate-400 mt-0.5">Lender: {loans.find(l => l.loanId === p.loanId)?.lenderName || '—'}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Lender: {resolveProfileName(loans.find(l => l.loanId === p.loanId)?.lenderName, loans.find(l => l.loanId === p.loanId)?.lenderPhone, profileMap)}</p>
                   )}
                   <p className="text-xs text-red-500 font-semibold mt-0.5">{p.daysOverdue}d overdue · Due {p.dueDate}</p>
                 </div>
@@ -742,9 +745,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               <div key={p.id} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
-                  <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
+                  <p className="text-sm font-medium text-slate-800">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</p>
                   {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
-                    <p className="text-xs text-slate-400 mt-0.5">Lender: {loans.find(l => l.loanId === p.loanId)?.lenderName || '—'}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Lender: {resolveProfileName(loans.find(l => l.loanId === p.loanId)?.lenderName, loans.find(l => l.loanId === p.loanId)?.lenderPhone, profileMap)}</p>
                   )}
                   <p className="text-xs text-amber-600 mt-0.5">Due {p.dueDate} · {p.monthYear}</p>
                 </div>

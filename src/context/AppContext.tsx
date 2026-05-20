@@ -47,6 +47,7 @@ interface AppContextValue {
   importFile: (file: File) => Promise<void>;
   exportData: () => void;
   clearAllData: () => Promise<void>;
+  profileMap: Map<string, string>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -66,6 +67,7 @@ async function fetchBundledExcel(): Promise<File> {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [autoImporting, setAutoImporting] = useState(false);
+  const [profileMap, setProfileMap] = useState<Map<string, string>>(new Map());
   const { user, isAdmin, displayName, adminPhone } = useAuth();
   const { loans, bulkLoadLoans } = useLoans();
   const { payments, bulkLoadPayments } = usePayments();
@@ -87,8 +89,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     Promise.all([
       loansService.fetchAll(),
       paymentsService.fetchAll(),
+      profilesService.listAll(),
     ])
-      .then(async ([l0, p]) => {
+      .then(async ([l0, p, profiles]) => {
+        const normPh = (ph: string) => ph.replace(/\D/g, '').slice(-10);
+        const map = new Map<string, string>();
+        for (const pr of profiles) {
+          const name = pr.fullName || pr.displayName;
+          if (pr.phone && name) map.set(normPh(pr.phone), name);
+        }
+        setProfileMap(map);
         let l = l0;
         if (l.length > 0) {
           // If admin has a real name, backfill loans that have no lender name set
@@ -194,7 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [bulkLoadLoans, bulkLoadPayments]);
 
   return (
-    <AppContext.Provider value={{ loading, autoImporting, importFile, exportData, clearAllData }}>
+    <AppContext.Provider value={{ loading, autoImporting, importFile, exportData, clearAllData, profileMap }}>
       {children}
     </AppContext.Provider>
   );

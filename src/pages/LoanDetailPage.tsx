@@ -13,6 +13,8 @@ import {
 } from '@/services/confirmationsService';
 import { profilesService } from '@/services/profilesService';
 import { formatCurrency, ordinal } from '@/utils/formatUtils';
+import { useApp } from '@/context/AppContext';
+import { resolveProfileName } from '@/utils/profileUtils';
 import { ChevronLeft, CheckCircle, XCircle, Clock, Edit2, MessageSquare, Smartphone, ArrowRight } from 'lucide-react';
 import type { Loan } from '@/types';
 
@@ -99,6 +101,7 @@ export function LoanDetailPage() {
   const { loans, updateLoan } = useLoans();
   const { payments } = usePayments();
   const { phone, user, isSuperAdmin, hasFullAccess } = useAuth();
+  const { profileMap } = useApp();
   const { claimPayment } = usePayments();
   const { showSuccess, showError } = useToast();
 
@@ -266,7 +269,7 @@ export function LoanDetailPage() {
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">{loan.loanId}</p>
-            <h2 className="text-lg font-bold text-slate-800 mt-0.5">{loan.borrowerName}</h2>
+            <h2 className="text-lg font-bold text-slate-800 mt-0.5">{resolveProfileName(loan.borrowerName, loan.borrowerPhone, profileMap)}</h2>
             {loan.borrowerPhone && <p className="text-xs text-slate-400 mt-0.5">{loan.borrowerPhone}</p>}
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -316,10 +319,10 @@ export function LoanDetailPage() {
         {/* Parties */}
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           {[
-            { role: 'Lender', name: loan.lenderName || '—', phone: loan.lenderPhone },
-            { role: 'Borrower', name: loan.borrowerName, phone: loan.borrowerPhone },
+            { role: 'Lender', name: resolveProfileName(loan.lenderName, loan.lenderPhone, profileMap), phone: loan.lenderPhone },
+            { role: 'Borrower', name: resolveProfileName(loan.borrowerName, loan.borrowerPhone, profileMap), phone: loan.borrowerPhone },
             ...(loan.loanType === 'Through Mediator'
-              ? [{ role: 'Mediator', name: loan.mediatorName || '—', phone: loan.mediatorPhone }]
+              ? [{ role: 'Mediator', name: resolveProfileName(loan.mediatorName, loan.mediatorPhone, profileMap), phone: loan.mediatorPhone }]
               : []),
           ].map(({ role, name, phone: ph }) => (
             <div key={role} className="border border-slate-100 rounded-xl p-3">

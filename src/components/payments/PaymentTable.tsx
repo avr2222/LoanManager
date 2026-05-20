@@ -5,6 +5,9 @@ import type { Payment, PaymentStatus } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { EmptyState } from '@/components/common/EmptyState';
 import { formatCurrency, formatDate } from '@/utils/formatUtils';
+import { useApp } from '@/context/AppContext';
+import { useLoans } from '@/context/LoanContext';
+import { resolveProfileName } from '@/utils/profileUtils';
 
 type FilterValue = PaymentStatus | 'All' | 'Overdue';
 
@@ -27,6 +30,8 @@ type SortKey = 'monthYear' | 'loanId' | 'borrowerName' | 'netAmountExpected' | '
 
 export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, readOnly, ownedLoanIds, canAdd = true, activeFilter }: PaymentTableProps) {
   const navigate = useNavigate();
+  const { profileMap } = useApp();
+  const { loans } = useLoans();
   // A row is editable if readOnly is false AND (no ownedLoanIds filter, or the payment's loan is owned by the current user)
   const canAct = (p: Payment) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(p.loanId));
   const [search, setSearch] = useState('');
@@ -180,7 +185,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <button onClick={() => navigate(`/loans/${p.loanId}`)} className="text-xs font-mono font-semibold text-indigo-500 hover:underline">{p.loanId}</button>
-                    <p className="text-sm font-semibold text-slate-800">{p.borrowerName}</p>
+                    <p className="text-sm font-semibold text-slate-800">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</p>
                     <p className="text-xs text-slate-400">{p.monthYear} · Due {formatDate(p.dueDate)}</p>
                   </div>
                   {canAct(p) && (
@@ -259,7 +264,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                   {paged.map((p) => (
                     <tr key={p.id} className={`hover:bg-slate-50/60 transition-colors ${p.daysOverdue > 0 ? 'bg-red-50/40' : ''}`}>
                       <td className="px-4 py-3"><button onClick={() => navigate(`/loans/${p.loanId}`)} className="text-xs font-mono font-semibold text-indigo-500 hover:underline">{p.loanId}</button></td>
-                      <td className="px-4 py-3 text-sm text-slate-700">{p.borrowerName}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{p.monthYear}</td>
                       <td className="px-4 py-3 text-sm text-slate-500">{formatDate(p.dueDate)}</td>
                       <td className="px-4 py-3 text-sm font-medium text-slate-800">{formatCurrency(p.netAmountExpected)}</td>

@@ -5,6 +5,8 @@ import type { Loan, LoanStatus } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { EmptyState } from '@/components/common/EmptyState';
 import { formatCurrency, formatDate } from '@/utils/formatUtils';
+import { useApp } from '@/context/AppContext';
+import { resolveProfileName } from '@/utils/profileUtils';
 
 type RoleFilter = 'MyLoans' | 'All' | 'Lender' | 'Borrower' | 'Mediator';
 
@@ -24,24 +26,25 @@ interface LoanTableProps {
   roleFilter?: RoleFilter;
 }
 
-function getCounterparty(loan: Loan, roleFilter: RoleFilter | undefined, userPhone: string | undefined) {
+function getCounterparty(loan: Loan, roleFilter: RoleFilter | undefined, userPhone: string | undefined, profileMap: Map<string, string>) {
   const normP = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
   if (roleFilter === 'Borrower') {
-    return { name: loan.lenderName || '—', phone: loan.lenderPhone };
+    return { name: resolveProfileName(loan.lenderName, loan.lenderPhone, profileMap), phone: loan.lenderPhone };
   }
   if (roleFilter === 'MyLoans' && userPhone) {
     const my = normP(userPhone);
     if (my && normP(loan.borrowerPhone) === my) {
-      return { name: loan.lenderName || '—', phone: loan.lenderPhone };
+      return { name: resolveProfileName(loan.lenderName, loan.lenderPhone, profileMap), phone: loan.lenderPhone };
     }
   }
-  return { name: loan.borrowerName, phone: loan.borrowerPhone };
+  return { name: resolveProfileName(loan.borrowerName, loan.borrowerPhone, profileMap), phone: loan.borrowerPhone };
 }
 
 type SortKey = 'loanId' | 'borrowerName' | 'principalAmount' | 'monthlyInterestAmount' | 'loanStatus' | 'dateGiven';
 
 export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowClick, readOnly, ownedLoanIds, userPhone, roleFilter }: LoanTableProps) {
   const { t } = useTranslation();
+  const { profileMap } = useApp();
   const canAct = (loan: Loan) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(loan.loanId));
 
   const counterpartyLabel =
@@ -54,8 +57,8 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
     if (loan.loanType !== 'Through Mediator') return t('loans.direct');
     const norm = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
     const isSelf = userPhone && norm(loan.mediatorPhone) === norm(userPhone);
-    if (isSelf) return t('loans.fromLender', { name: loan.lenderName || 'Admin' });
-    return t('loans.viaMediator', { name: loan.mediatorName || t('loans.mediator') });
+    if (isSelf) return t('loans.fromLender', { name: resolveProfileName(loan.lenderName, loan.lenderPhone, profileMap) || 'Admin' });
+    return t('loans.viaMediator', { name: resolveProfileName(loan.mediatorName, loan.mediatorPhone, profileMap) || t('loans.mediator') });
   }
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<LoanStatus | 'All'>('Active');
@@ -183,7 +186,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
                 <div className="flex items-start justify-between">
                   <div>
                     <span className="text-xs font-mono font-semibold text-indigo-500">{loan.loanId}</span>
-                    {(() => { const cp = getCounterparty(loan, roleFilter, userPhone); return (<>
+                    {(() => { const cp = getCounterparty(loan, roleFilter, userPhone, profileMap); return (<>
                       <p className="text-sm font-semibold text-slate-900">{cp.name}</p>
                       <p className="text-xs text-slate-400">{cp.phone}</p>
                     </>); })()}
@@ -256,7 +259,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
                     >
                       <td className="px-4 py-3 text-xs font-mono font-semibold text-indigo-500">{loan.loanId}</td>
                       <td className="px-4 py-3">
-                        {(() => { const cp = getCounterparty(loan, roleFilter, userPhone); return (<>
+                        {(() => { const cp = getCounterparty(loan, roleFilter, userPhone, profileMap); return (<>
                           <div className="text-sm font-medium text-slate-800">{cp.name}</div>
                           <div className="text-xs text-slate-400">{cp.phone}</div>
                         </>); })()}
