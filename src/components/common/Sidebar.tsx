@@ -1,26 +1,43 @@
+import { useMemo } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { LayoutDashboard, CreditCard, BarChart3, Upload, HandCoins, User, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { usePayments } from '@/context/PaymentContext';
+import { useLoans } from '@/context/LoanContext';
 
 export function Sidebar() {
   const { t } = useTranslation();
-  const { isAdmin, displayName } = useAuth();
+  const { isAdmin, displayName, phone, adminPhone } = useAuth();
   const { payments } = usePayments();
+  const { loans } = useLoans();
 
-  const overdueCount = payments.filter(
-    (p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived'
-  ).length;
+  const isOverdue = (p: { daysOverdue: number; paymentStatus: string }) =>
+    p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived';
+
+  const allOverdueCount = payments.filter(isOverdue).length;
+
+  const myOverdueCount = useMemo(() => {
+    if (!isAdmin) return allOverdueCount;
+    const norm = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
+    const myPhone = norm(phone || adminPhone);
+    if (!myPhone) return 0;
+    const myLoanIds = new Set(
+      loans
+        .filter((l) => norm(l.lenderPhone) === myPhone || norm(l.mediatorPhone) === myPhone)
+        .map((l) => l.loanId)
+    );
+    return payments.filter((p) => myLoanIds.has(p.loanId) && isOverdue(p)).length;
+  }, [isAdmin, phone, adminPhone, loans, payments, allOverdueCount]);
 
   const commonNav = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard'), badge: 0 },
     { to: '/loans',     icon: CreditCard,      label: t('nav.loans'),     badge: 0 },
-    { to: '/payments',  icon: BarChart3,        label: t('nav.payments'),  badge: overdueCount },
+    { to: '/payments',  icon: BarChart3,        label: t('nav.payments'),  badge: myOverdueCount },
   ];
   const adminGlobalNav = [
     { to: '/loans?all=1',    icon: CreditCard, label: 'All Loans',    badge: 0 },
-    { to: '/payments?all=1', icon: BarChart3,  label: 'All Payments', badge: overdueCount },
+    { to: '/payments?all=1', icon: BarChart3,  label: 'All Payments', badge: allOverdueCount },
   ];
   const adminOnlyNav = [
     { to: '/users',  icon: Users,  label: t('nav.users'),   badge: 0 },
