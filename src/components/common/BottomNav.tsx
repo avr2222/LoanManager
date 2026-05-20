@@ -1,17 +1,31 @@
+import { useMemo } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, CreditCard, BarChart3, Upload, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { usePayments } from '@/context/PaymentContext';
+import { useLoans } from '@/context/LoanContext';
 
 export function BottomNav() {
   const { t } = useTranslation();
-  const { isAdmin } = useAuth();
+  const { isAdmin, phone, adminPhone } = useAuth();
   const { payments } = usePayments();
+  const { loans } = useLoans();
 
-  const overdueCount = payments.filter(
-    (p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived'
-  ).length;
+  const isOverdue = (p: { daysOverdue: number; paymentStatus: string }) =>
+    p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived';
+
+  const overdueCount = useMemo(() => {
+    const norm = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
+    const myPhone = norm(phone || adminPhone);
+    if (!myPhone) return 0;
+    const myLoanIds = new Set(
+      loans
+        .filter((l) => norm(l.lenderPhone) === myPhone || norm(l.mediatorPhone) === myPhone)
+        .map((l) => l.loanId)
+    );
+    return payments.filter((p) => myLoanIds.has(p.loanId) && isOverdue(p)).length;
+  }, [phone, adminPhone, loans, payments]);
 
   const commonNav = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard'), badge: 0 },
