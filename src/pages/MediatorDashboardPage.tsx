@@ -435,26 +435,33 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
 
       {/* ── KPI cards — one row per role ── */}
       {hasBorrower && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <KpiCard label={t('dashboard.loansTaken')}    value={String(borrowerLoans.length)} />
-          <KpiCard label={t('dashboard.totalBorrowed')} value={formatCurrency(totalBorrowed)}  color="indigo" />
-          <div className="col-span-2 sm:col-span-1">
-            <KpiCard label={t('dashboard.monthlyDue')} value={formatCurrency(totalMonthlyDue)} color="red" wide />
+        <>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest -mb-1">As Borrower</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <KpiCard label={t('dashboard.loansTaken')}    value={String(borrowerLoans.length)} />
+            <KpiCard label={t('dashboard.totalBorrowed')} value={formatCurrency(totalBorrowed)}  color="indigo" />
+            <div className="col-span-2 sm:col-span-1">
+              <KpiCard label={t('dashboard.monthlyDue')} value={formatCurrency(totalMonthlyDue)} color="red" wide />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {hasLender && !hasMediator && !hasBorrower ? (
-        <div className="grid grid-cols-2 gap-3">
-          <KpiCard label={t('dashboard.loansGiven')}  value={String(lenderLoans.length)}
-            sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} />
-          <KpiCard label={t('dashboard.totalLent')}   value={formatCurrency(totalLentPrincipal)} color="indigo" />
-          <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" />
-          <KpiCard label={t('dashboard.overdue')}     value={String(overdueCount)} color="red"
-            sub={overdueCount > 0 ? t('dashboard.paymentsLate') : t('dashboard.allOnTime')} />
-        </div>
+        <>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest -mb-1">As Lender</p>
+          <div className="grid grid-cols-2 gap-3">
+            <KpiCard label={t('dashboard.loansGiven')}  value={String(lenderLoans.length)}
+              sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} />
+            <KpiCard label={t('dashboard.totalLent')}   value={formatCurrency(totalLentPrincipal)} color="indigo" />
+            <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" />
+            <KpiCard label={t('dashboard.overdue')}     value={String(overdueCount)} color="red"
+              sub={overdueCount > 0 ? t('dashboard.paymentsLate') : t('dashboard.allOnTime')} />
+          </div>
+        </>
       ) : hasLender ? (
         <>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest -mb-1">As Lender</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <KpiCard label={t('dashboard.loansGiven')}  value={String(lenderLoans.length)}
               sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} />
@@ -482,11 +489,13 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
       ) : null}
 
       {hasMediator && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest -mb-1">As Mediator</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <KpiCard label={t('dashboard.loansMediated')}     value={String(mediatorLoans.length)}
             sub={t('dashboard.borrowers', { count: mediatorByBorrower.length })} />
           <KpiCard label={t('dashboard.mediatedPrincipal')} value={formatCurrency(totalMediatedPrincipal)} color="indigo" />
-          <KpiCard label={t('dashboard.commission')}        value={formatCurrency(monthlyCommission)}      color="green" />
+          <KpiCard label={t('dashboard.commission')}        value={formatCurrency(monthlyCommission)}      color={monthlyCommission > 0 ? 'green' : 'default'} />
           <KpiCard
             label={hasBorrower ? t('dashboard.netPerMonth') : t('dashboard.overdue')}
             value={hasBorrower
@@ -496,6 +505,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             sub={hasBorrower ? `${overdueCount} overdue` : undefined}
           />
         </div>
+        </>
       )}
 
       {!hasLender && !hasMediator && hasBorrower && (
@@ -605,7 +615,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
     </div>
 
     {/* RIGHT column — payment alerts */}
-    <div className="space-y-4 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-4">
+    <div className="space-y-4 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-4 xl:max-h-[calc(100vh-5rem)] xl:overflow-y-auto xl:pr-1">
 
       {/* ── Pending Verification (borrower claimed, lender to confirm) ── */}
       {claimedPayments.length > 0 && (
@@ -625,7 +635,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
 
           <div className="divide-y divide-slate-50">
             {claimedPayments.map((p) => (
-              <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
+              <div key={p.id} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
                   <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
@@ -671,7 +681,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
 
           <div className="divide-y divide-slate-50">
             {overduePayments.map((p) => (
-              <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
+              <div key={p.id} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
                   <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>
@@ -729,7 +739,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
 
           <div className="divide-y divide-slate-50">
             {upcomingPayments.map((p) => (
-              <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
+              <div key={p.id} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
                   <p className="text-sm font-medium text-slate-800">{p.borrowerName}</p>

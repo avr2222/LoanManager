@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Loan, LoanStatus } from '@/types';
 import { useLoans } from '@/context/LoanContext';
@@ -22,11 +22,14 @@ export function LoansPage() {
   const navigate = useNavigate();
 
   const myPhone = (phone || adminPhone || '').replace(/\D/g, '').slice(-10);
+  const [searchParams] = useSearchParams();
 
   const [showForm, setShowForm] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | undefined>();
   const [deletingLoanId, setDeletingLoanId] = useState<string | null>(null);
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>(isAdmin ? 'All' : 'MyLoans');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>(
+    isAdmin && searchParams.get('all') === '1' ? 'All' : 'MyLoans'
+  );
   const [lenderFilter, setLenderFilter] = useState(''); // admin only: filter by lender phone
 
   // Unique lenders in the system (admin only)

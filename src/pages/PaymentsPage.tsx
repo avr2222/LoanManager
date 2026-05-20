@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import type { Payment } from '@/types';
 import { usePayments } from '@/context/PaymentContext';
@@ -16,7 +16,9 @@ import { useAuth } from '@/context/AuthContext';
 export function PaymentsPage() {
   const { payments, addPayment, updatePayment, deletePayment } = usePayments();
   const { loans } = useLoans();
-  const { hasFullAccess, isAdmin, userPhone } = useAuth();
+  const { hasFullAccess, isAdmin, userPhone, phone, adminPhone } = useAuth();
+  const [searchParams] = useSearchParams();
+  const showAll = isAdmin && searchParams.get('all') === '1';
 
   // For phone users: allow actions on payments for loans they own as lender or mediator
   // (mediator manages payments when the lender doesn't use the app)
@@ -34,6 +36,22 @@ export function PaymentsPage() {
         .map((l) => l.loanId)
     );
   }, [isAdmin, userPhone, loans]);
+
+  // Admin personal filter: only payments for loans where admin is lender/mediator
+  const myLoanIds = useMemo(() => {
+    if (!isAdmin || showAll) return null;
+    const norm = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
+    const myPhone = norm(phone || adminPhone);
+    if (!myPhone) return null;
+    return new Set(
+      loans
+        .filter((l) => norm(l.lenderPhone) === myPhone || norm(l.mediatorPhone) === myPhone)
+        .map((l) => l.loanId)
+    );
+  }, [isAdmin, showAll, loans, phone, adminPhone]);
+
+  const visiblePayments = myLoanIds ? payments.filter((p) => myLoanIds.has(p.loanId)) : payments;
+
   const { showSuccess, showError } = useToast();
   const location = useLocation();
 
@@ -104,10 +122,10 @@ export function PaymentsPage() {
     }
   }
 
-  const totalExpected = payments.reduce((s, p) => s + p.netAmountExpected, 0);
-  const totalReceived = payments.reduce((s, p) => s + p.amountReceived, 0);
-  const totalPending = payments.filter((p) => p.paymentStatus === 'Pending' || p.paymentStatus === 'Partial').reduce((s, p) => s + p.pendingAmount, 0);
-  const overdueCount = payments.filter((p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived').length;
+  const totalExpected = visiblePayments.reduce((s, p) => s + p.netAmountExpected, 0);
+  const totalReceived = visiblePayments.reduce((s, p) => s + p.amountReceived, 0);
+  const totalPending = visiblePayments.filter((p) => p.paymentStatus === 'Pending' || p.paymentStatus === 'Partial').reduce((s, p) => s + p.pendingAmount, 0);
+  const overdueCount = visiblePayments.filter((p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived').length;
 
   return (
     <div>
@@ -135,7 +153,7 @@ export function PaymentsPage() {
       </div>
 
       <PaymentTable
-        payments={payments}
+        payments={visiblePayments}
         onEdit={(p) => setEditingPayment(p)}
         onDelete={(id) => setDeletingId(id)}
         onAdd={() => { setDefaultLoanId(undefined); setShowForm(true); }}

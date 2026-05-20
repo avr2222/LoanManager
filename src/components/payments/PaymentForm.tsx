@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Payment, PaymentStatus } from '@/types';
 import { useLoans } from '@/context/LoanContext';
 import { useAuth } from '@/context/AuthContext';
-import { formatCurrency, formatMonthYear } from '@/utils/formatUtils';
+import { formatCurrency, formatMonthYear, formatDate } from '@/utils/formatUtils';
 import { getDueDateForMonth, toISODateString } from '@/utils/dateUtils';
 
 interface PaymentFormProps {
@@ -151,7 +151,7 @@ export function PaymentForm({ initialValues, defaultLoanId, onSubmit, onCancel }
           <option value="">Select a loan...</option>
           {activeLoans.map((l) => (
             <option key={l.loanId} value={l.loanId}>
-              {l.loanId} — {l.borrowerName}
+              {l.loanId} — {l.borrowerName} | {formatCurrency(l.principalAmount)}{l.dateGiven ? ` | ${formatDate(l.dateGiven)}` : ''}
             </option>
           ))}
         </select>
