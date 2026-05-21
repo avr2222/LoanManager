@@ -35,6 +35,7 @@ export interface Loan {
   deletedBy?: string | null;        // phone or email of who deleted it
   creatorId?: string;               // auth.users.id of who created this loan record
   confirmationStatus?: 'Pending' | 'Confirmed' | 'Disputed';
+  closedAt?: string | null;           // ISO timestamp when loan was closed/written off
 }
 
 // ── Monthly Payment ───────────────────────────────────────────────────────────

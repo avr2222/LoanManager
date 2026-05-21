@@ -273,13 +273,18 @@ export function LoanDetailPage() {
             {loan.borrowerPhone && <p className="text-xs text-slate-400 mt-0.5">{loan.borrowerPhone}</p>}
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-              loan.loanStatus === 'Active' ? 'bg-emerald-50 text-emerald-700' :
-              loan.loanStatus === 'Closed' ? 'bg-slate-100 text-slate-500' :
-              'bg-amber-50 text-amber-700'
-            }`}>
-              {loan.loanStatus}
-            </span>
+            <div className="text-right">
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                loan.loanStatus === 'Active' ? 'bg-emerald-50 text-emerald-700' :
+                loan.loanStatus === 'Closed' ? 'bg-slate-100 text-slate-500' :
+                'bg-amber-50 text-amber-700'
+              }`}>
+                {loan.loanStatus}
+              </span>
+              {loan.closedAt && loan.loanStatus !== 'Active' && (
+                <p className="text-[10px] text-slate-400 mt-1">Closed {new Date(loan.closedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+              )}
+            </div>
             {canEdit && (
               <button
                 onClick={() => setEditing(true)}

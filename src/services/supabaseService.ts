@@ -35,6 +35,7 @@ function toDbLoan(l: Loan, fallbackCreatorId?: string): Record<string, unknown> 
     remarks: l.remarks,
     created_at: l.createdAt,
     updated_at: l.updatedAt,
+    closed_at: l.closedAt ?? null,
   };
 }
 
@@ -67,6 +68,7 @@ function fromDbLoan(r: Record<string, unknown>): Loan {
     deletedBy: (r.deleted_by as string) ?? null,
     creatorId: (r.creator_id as string) ?? undefined,
     confirmationStatus: (r.confirmation_status as Loan['confirmationStatus']) ?? 'Pending',
+    closedAt: (r.closed_at as string) ?? null,
   };
 }
 

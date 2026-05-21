@@ -12,7 +12,7 @@ type LoanAction =
   | { type: 'ADD'; payload: Loan }
   | { type: 'UPDATE'; payload: Loan }
   | { type: 'DELETE'; payload: string }
-  | { type: 'SET_STATUS'; payload: { loanId: string; status: Loan['loanStatus'] } };
+  | { type: 'SET_STATUS'; payload: { loanId: string; status: Loan['loanStatus']; closedAt: string | null } };
 
 function loanReducer(state: Loan[], action: LoanAction): Loan[] {
   switch (action.type) {
@@ -27,7 +27,7 @@ function loanReducer(state: Loan[], action: LoanAction): Loan[] {
     case 'SET_STATUS':
       return state.map((l) =>
         l.loanId === action.payload.loanId
-          ? { ...l, loanStatus: action.payload.status, updatedAt: new Date().toISOString() }
+          ? { ...l, loanStatus: action.payload.status, closedAt: action.payload.closedAt, updatedAt: new Date().toISOString() }
           : l
       );
     default:
@@ -86,9 +86,12 @@ export function LoanProvider({ children }: { children: ReactNode }) {
   const setLoanStatus = useCallback(async (loanId: string, status: Loan['loanStatus']) => {
     const loan = loans.find((l) => l.loanId === loanId);
     if (!loan) return;
-    const updated = { ...loan, loanStatus: status, updatedAt: new Date().toISOString() };
+    const closedAt = status === 'Active'
+      ? null
+      : (loan.closedAt ?? new Date().toISOString());
+    const updated = { ...loan, loanStatus: status, closedAt, updatedAt: new Date().toISOString() };
     await loansService.upsert(updated);
-    dispatch({ type: 'SET_STATUS', payload: { loanId, status } });
+    dispatch({ type: 'SET_STATUS', payload: { loanId, status, closedAt } });
   }, [loans]);
 
   const bulkLoadLoans = useCallback((loans: Loan[]) => {
