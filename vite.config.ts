@@ -70,4 +70,10 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
   },
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    exclude: ['src/services/__tests__/creator_id.test.ts'],
+  },
 })

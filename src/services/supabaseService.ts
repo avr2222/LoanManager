@@ -279,7 +279,7 @@ export const paymentsService = {
     if (payments.length === 0) return;
     const { error } = await supabase
       .from('payments')
-      .upsert(payments.map(toDbPayment), { onConflict: 'loan_id,month_year' });
+      .upsert(payments.map(toDbPayment), { ignoreDuplicates: true });
     if (error) throw error;
   },
 

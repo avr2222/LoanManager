@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 
 interface ModalProps {
   title: string;
@@ -16,11 +16,17 @@ const sizeClasses = {
 };
 
 export function Modal({ title, onClose, children, size = 'lg' }: ModalProps) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-full items-end sm:items-center justify-center sm:p-4">
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div className={`relative bg-white w-full sm:rounded-2xl shadow-2xl shadow-black/10 border border-slate-200/60 ${sizeClasses[size]} z-10 rounded-t-2xl max-h-[95dvh] flex flex-col`}>
+        <div role="dialog" aria-modal="true" aria-label={title} className={`relative bg-white w-full sm:rounded-2xl shadow-2xl shadow-black/10 border border-slate-200/60 ${sizeClasses[size]} z-10 rounded-t-2xl max-h-[95dvh] flex flex-col`}>
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
             <h2 className="text-sm font-semibold text-slate-800 tracking-tight">{title}</h2>

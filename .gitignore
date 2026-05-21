@@ -17,6 +17,9 @@ dist
 dist-ssr
 *.local
 
+# Playwright auth state (contains session tokens — never commit)
+e2e/.auth/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

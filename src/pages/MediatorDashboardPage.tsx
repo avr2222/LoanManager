@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, Fragment } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Plus, FileText, ArrowRight, ChevronDown, ChevronUp, CheckCircle2, Users, X, Pencil, Trash2 } from 'lucide-react';
@@ -969,9 +969,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             </thead>
             <tbody>
               {lenderByBorrower.map((g) => (
-                <>
+                <Fragment key={g.phone || g.name}>
                   {g.loans.length > 1 && (
-                    <tr key={`hdr-${g.phone || g.name}`} className="bg-indigo-50/40 border-t border-indigo-100/60">
+                    <tr className="bg-indigo-50/40 border-t border-indigo-100/60">
                       <td className="pl-4 pr-5 py-2.5 border-l-4 border-indigo-300" colSpan={2}>
                         <p className="text-sm font-semibold text-slate-800">{g.name}</p>
                         {g.phone && <p className="text-xs text-slate-400">{g.phone}</p>}
@@ -1003,7 +1003,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                       <td className="px-5 py-3"><StatusBadge status={l.loanStatus} /></td>
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
               <tr className="border-t-2 border-slate-100 bg-slate-50/60">
                 <td className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider" colSpan={2}>Total</td>
@@ -1078,9 +1078,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             </thead>
             <tbody>
               {mediatorByBorrower.map((g) => (
-                <>
+                <Fragment key={g.phone || g.name}>
                   {g.loans.length > 1 && (
-                    <tr key={`hdr-${g.phone || g.name}`} className="bg-indigo-50/40 border-t border-indigo-100/60">
+                    <tr className="bg-indigo-50/40 border-t border-indigo-100/60">
                       <td className="pl-4 pr-5 py-2.5 border-l-4 border-indigo-300" colSpan={2}>
                         <p className="text-sm font-semibold text-slate-800">{g.name}</p>
                         {g.phone && <p className="text-xs text-slate-400">{g.phone} · {g.loans.length} loans</p>}
@@ -1117,7 +1117,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                       <td className="px-5 py-3"><StatusBadge status={l.loanStatus} /></td>
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
               <tr className="border-t-2 border-slate-100 bg-slate-50/60">
                 <td className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider" colSpan={2}>Total</td>
