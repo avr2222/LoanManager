@@ -711,7 +711,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                       <WhatsAppButton
                         variant="mediator"
                         phone={loan.mediatorPhone}
-                        message={mediatorOverdueMessage({ mediatorName: loan.mediatorName || 'Mediator', borrowerName: p.borrowerName, totalAmount: p.interestAmount, mediatorShare: p.mediatorShare, monthYear: p.monthYear, daysOverdue: p.daysOverdue })}
+                        message={mediatorOverdueMessage({ mediatorName: loan.mediatorName || 'Mediator', borrowerName: p.borrowerName, totalAmount: p.interestAmount, monthYear: p.monthYear, daysOverdue: p.daysOverdue })}
                       />
                     ) : (
                       <WhatsAppButton
@@ -778,7 +778,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                       <WhatsAppButton
                         variant="mediator"
                         phone={loan.mediatorPhone}
-                        message={mediatorDueMessage({ mediatorName: loan.mediatorName || 'Mediator', borrowerName: p.borrowerName, totalAmount: p.interestAmount, mediatorShare: p.mediatorShare, monthYear: p.monthYear, dueDate: p.dueDate })}
+                        message={mediatorDueMessage({ mediatorName: loan.mediatorName || 'Mediator', borrowerName: p.borrowerName, totalAmount: p.interestAmount, monthYear: p.monthYear, dueDate: p.dueDate })}
                       />
                     ) : (
                       <WhatsAppButton
