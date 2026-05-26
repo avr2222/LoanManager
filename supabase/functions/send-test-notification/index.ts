@@ -17,6 +17,10 @@ const VAPID_EMAIL       = Deno.env.get("VAPID_EMAIL") ?? "mailto:admin@loanmgr.a
 webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 Deno.serve(async (req) => {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return json({ error: "VAPID secrets not configured", sent: 0 }, 500);
+  }
+
   // Verify caller JWT
   const jwt = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!jwt) return json({ error: "Unauthorized" }, 401);

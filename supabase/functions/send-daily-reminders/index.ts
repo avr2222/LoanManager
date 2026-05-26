@@ -26,6 +26,10 @@ webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
 Deno.serve(async (_req) => {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return json({ error: "VAPID secrets not configured", sent: 0 }, 500);
+  }
+
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
   // Threshold for "more than 2 days overdue" = due_date < (today - 2 days)

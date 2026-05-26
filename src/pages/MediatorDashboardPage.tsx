@@ -195,6 +195,17 @@ export function MediatorDashboardPage() {
     return payments.filter((p) => allMyLoanIds.has(p.loanId));
   }, [payments, allMyLoanIds, isAdmin, isViewAs]);
 
+  // Active loan IDs across all roles — used to exclude closed loans from alert panels
+  const activeLoanIds = useMemo(
+    () => new Set(loans.filter((l) => l.loanStatus === 'Active').map((l) => l.loanId)),
+    [loans]
+  );
+  // Fast O(1) loan lookup used throughout the alert panels
+  const loanMap = useMemo(
+    () => new Map(loans.map((l) => [l.loanId, l])),
+    [loans]
+  );
+
   // Claimed by borrower, awaiting lender verification
   const claimedPayments = useMemo(() =>
     myPayments
@@ -206,9 +217,9 @@ export function MediatorDashboardPage() {
   // Overdue excludes claimed (borrower has already initiated payment)
   const overduePayments = useMemo(() =>
     myPayments
-      .filter((p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && p.paymentStatus !== 'Claimed')
+      .filter((p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && p.paymentStatus !== 'Claimed' && activeLoanIds.has(p.loanId))
       .sort((a, b) => b.daysOverdue - a.daysOverdue),
-    [myPayments]
+    [myPayments, activeLoanIds]
   );
 
   const upcomingPayments = useMemo(() => {
@@ -218,11 +229,12 @@ export function MediatorDashboardPage() {
       .filter((p) => {
         if (p.paymentStatus === 'Received' || p.paymentStatus === 'Waived' || p.paymentStatus === 'Claimed') return false;
         if (p.daysOverdue > 0) return false;
+        if (!activeLoanIds.has(p.loanId)) return false;
         const due = new Date(p.dueDate);
         return due >= today && due <= in45;
       })
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [myPayments]);
+  }, [myPayments, activeLoanIds]);
 
   // KPI amounts — active loans only (base arrays already filtered to Active)
   const totalBorrowed          = borrowerLoans.reduce((s, l) => s + l.principalAmount, 0);
@@ -651,8 +663,8 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             {claimedPayments.map((p) => (
               <div key={p.id} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
-                  <p className="text-sm font-medium text-slate-800">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</p>
+                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loanMap.get(p.loanId)?.principalAmount ?? 0)}</p>
+                  <p className="text-sm font-medium text-slate-800">{resolveProfileName(p.borrowerName, loanMap.get(p.loanId)?.borrowerPhone, profileMap)}</p>
                   <p className="text-xs text-violet-600 mt-0.5">{p.monthYear} · {p.dueDate}</p>
                   {p.remarks && p.remarks.includes('UTR:') && (
                     <p className="text-xs text-slate-400 mt-0.5">{p.remarks.slice(p.remarks.indexOf('UTR:'))}</p>
@@ -697,16 +709,16 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             {overduePayments.map((p) => (
               <div key={p.id} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
-                  <p className="text-sm font-medium text-slate-800">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</p>
+                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loanMap.get(p.loanId)?.principalAmount ?? 0)}</p>
+                  <p className="text-sm font-medium text-slate-800">{resolveProfileName(p.borrowerName, loanMap.get(p.loanId)?.borrowerPhone, profileMap)}</p>
                   {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
-                    <p className="text-xs text-slate-400 mt-0.5">Lender: {resolveProfileName(loans.find(l => l.loanId === p.loanId)?.lenderName, loans.find(l => l.loanId === p.loanId)?.lenderPhone, profileMap)}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Lender: {resolveProfileName(loanMap.get(p.loanId)?.lenderName, loanMap.get(p.loanId)?.lenderPhone, profileMap)}</p>
                   )}
                   <p className="text-xs text-red-500 font-semibold mt-0.5">{p.daysOverdue}d overdue · Due {p.dueDate}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {lenderLoanIds.has(p.loanId) && (() => {
-                    const loan = loans.find(l => l.loanId === p.loanId);
+                    const loan = loanMap.get(p.loanId);
                     return loan?.loanType === 'Through Mediator' && loan?.mediatorPhone ? (
                       <WhatsAppButton
                         variant="mediator"
@@ -717,11 +729,12 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                       <WhatsAppButton
                         phone={loan?.borrowerPhone ?? ''}
                         message={overdueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, daysOverdue: p.daysOverdue, upiId: profile?.upiId ?? undefined, lenderName: loan?.lenderName })}
+                        upiConfigured={!!profile?.upiId}
                       />
                     );
                   })()}
                   {mediatorLoanIds.has(p.loanId) && (() => {
-                    const loan = loans.find(l => l.loanId === p.loanId);
+                    const loan = loanMap.get(p.loanId);
                     return loan?.lenderPhone ? (
                       <WhatsAppButton
                         phone={loan.lenderPhone}
@@ -764,16 +777,16 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
             {upcomingPayments.map((p) => (
               <div key={p.id} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loans.find(l => l.loanId === p.loanId)?.principalAmount ?? 0)}</p>
-                  <p className="text-sm font-medium text-slate-800">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</p>
+                  <p className="text-xs font-mono font-semibold text-indigo-500">{p.loanId} → {formatCurrency(loanMap.get(p.loanId)?.principalAmount ?? 0)}</p>
+                  <p className="text-sm font-medium text-slate-800">{resolveProfileName(p.borrowerName, loanMap.get(p.loanId)?.borrowerPhone, profileMap)}</p>
                   {mediatorLoanIds.has(p.loanId) && !lenderLoanIds.has(p.loanId) && (
-                    <p className="text-xs text-slate-400 mt-0.5">Lender: {resolveProfileName(loans.find(l => l.loanId === p.loanId)?.lenderName, loans.find(l => l.loanId === p.loanId)?.lenderPhone, profileMap)}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Lender: {resolveProfileName(loanMap.get(p.loanId)?.lenderName, loanMap.get(p.loanId)?.lenderPhone, profileMap)}</p>
                   )}
                   <p className="text-xs text-amber-600 mt-0.5">Due {p.dueDate} · {p.monthYear}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {lenderLoanIds.has(p.loanId) && (() => {
-                    const loan = loans.find(l => l.loanId === p.loanId);
+                    const loan = loanMap.get(p.loanId);
                     return loan?.loanType === 'Through Mediator' && loan?.mediatorPhone ? (
                       <WhatsAppButton
                         variant="mediator"
@@ -784,6 +797,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
                       <WhatsAppButton
                         phone={loan?.borrowerPhone ?? ''}
                         message={dueMessage({ borrowerName: p.borrowerName, amount: p.netAmountExpected, monthYear: p.monthYear, dueDate: p.dueDate, upiId: profile?.upiId ?? undefined, lenderName: loan?.lenderName })}
+                        upiConfigured={!!profile?.upiId}
                       />
                     );
                   })()}

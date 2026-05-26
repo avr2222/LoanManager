@@ -26,7 +26,7 @@ interface PaymentTableProps {
   activeFilter?: FilterValue;
 }
 
-type SortKey = 'monthYear' | 'loanId' | 'borrowerName' | 'netAmountExpected' | 'amountReceived' | 'daysOverdue' | 'paymentStatus';
+type SortKey = 'monthYear' | 'loanId' | 'borrowerName' | 'netAmountExpected' | 'amountReceived' | 'daysOverdue' | 'paymentStatus' | 'dueDate';
 
 export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, readOnly, ownedLoanIds, canAdd = true, activeFilter }: PaymentTableProps) {
   const navigate = useNavigate();
@@ -36,8 +36,8 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
   const canAct = (p: Payment) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(p.loanId));
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterValue>('All');
-  const [sortKey, setSortKey] = useState<SortKey>('daysOverdue');
-  const [sortAsc, setSortAsc] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>('dueDate');
+  const [sortAsc, setSortAsc] = useState(true);
   const [page, setPage] = useState(1);           // desktop pagination
   const [mobilePage, setMobilePage] = useState(1); // mobile infinite scroll
   const PAGE_SIZE = 25;
@@ -251,7 +251,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                     {th('loanId', 'Loan')}
                     {th('borrowerName', 'Borrower')}
                     {th('monthYear', 'Month')}
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Due Date</th>
+                    {th('dueDate', 'Due Date')}
                     {th('netAmountExpected', 'Expected')}
                     {th('amountReceived', 'Received')}
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Pending</th>

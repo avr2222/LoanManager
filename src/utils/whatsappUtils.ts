@@ -27,6 +27,7 @@ export function overdueMessage(p: {
     const link = `upi://pay?pa=${encodeURIComponent(p.upiId)}&pn=${name}&am=${p.amount}&cu=INR&tn=${ref}`;
     msg += `\n\nPay via UPI:\n${link}\n\nUPI ద్వారా చెల్లించండి:\n${link}`;
   }
+  if (p.lenderName) msg += `\n\n- ${p.lenderName}`;
   return msg;
 }
 
@@ -49,6 +50,7 @@ export function dueMessage(p: {
     const link = `upi://pay?pa=${encodeURIComponent(p.upiId)}&pn=${name}&am=${p.amount}&cu=INR&tn=${ref}`;
     msg += `\n\nPay via UPI:\n${link}\n\nUPI ద్వారా చెల్లించండి:\n${link}`;
   }
+  if (p.lenderName) msg += `\n\n- ${p.lenderName}`;
   return msg;
 }
 

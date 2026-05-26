@@ -10,15 +10,6 @@ interface Props {
 
 type Step = 'phone' | 'question' | 'newpassword';
 
-const SECURITY_QUESTIONS = [
-  "What is your father's name?",
-  "What is your mother's maiden name?",
-  "What is your childhood nickname?",
-  "What is your pet's name?",
-  "What is the name of your hometown?",
-  "What is the name of your first school?",
-];
-
 export function ForgotPasswordModal({ phone: initialPhone, onClose, onSuccess }: Props) {
   const [step, setStep]               = useState<Step>(initialPhone.length === 10 ? 'question' : 'phone');
   const [phone, setPhone]             = useState(initialPhone);
