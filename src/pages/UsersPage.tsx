@@ -186,7 +186,8 @@ export function UsersPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [tab, setTab]                 = useState<'users' | 'invites'>('users');
-  const [testingPush, setTestingPush] = useState<string | null>(null);
+  const [testingPush, setTestingPush]   = useState<string | null>(null);
+  const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
 
   const { phoneToName, phoneToRole } = useMemo(() => {
     const nameMap = new Map<string, string>();
@@ -220,6 +221,10 @@ export function UsersPage() {
     ]);
     setUsers(userData);
     setInvitations(inviteData);
+    if (isSuperAdmin) {
+      const { data: ids } = await supabase.rpc('get_subscribed_user_ids');
+      setSubscribedIds(new Set(ids ?? []));
+    }
     setLoading(false);
   }
 
@@ -367,6 +372,7 @@ export function UsersPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Name / Phone</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Role</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                  {isSuperAdmin && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Push</th>}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Disabled By</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Action</th>
                 </tr>
@@ -417,6 +423,14 @@ export function UsersPage() {
                           </span>
                         )}
                       </td>
+                      {isSuperAdmin && (
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          {subscribedIds.has(u.id)
+                            ? <span title="Push notifications enabled" className="inline-flex items-center gap-1 text-xs text-emerald-600"><Bell size={12} /> On</span>
+                            : <span title="No push subscription" className="text-xs text-slate-300">—</span>
+                          }
+                        </td>
+                      )}
                       <td className="px-4 py-3 hidden sm:table-cell">
                         {!u.isActive && u.disabledBy ? (
                           <span className="text-xs text-slate-400">{u.disabledBy}</span>
