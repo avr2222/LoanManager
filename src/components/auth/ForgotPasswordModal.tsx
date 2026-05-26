@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -31,6 +31,21 @@ export function ForgotPasswordModal({ phone: initialPhone, onClose, onSuccess }:
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
   const [success, setSuccess]         = useState('');
+
+  useEffect(() => {
+    if (step === 'question' && !question) {
+      setLoading(true);
+      supabase.rpc('get_security_question', { p_phone: phone }).then(({ data }) => {
+        setLoading(false);
+        if (data) {
+          setQuestion(data as string);
+        } else {
+          setError('No security question found for this account. Contact admin.');
+          setStep('phone');
+        }
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handlePhoneSubmit() {
     const cleaned = phone.replace(/\D/g, '').slice(-10);
@@ -148,7 +163,10 @@ export function ForgotPasswordModal({ phone: initialPhone, onClose, onSuccess }:
               <div className="space-y-3">
                 <div className="bg-slate-50 rounded-xl px-4 py-3">
                   <p className="text-xs font-medium text-slate-400 mb-1">Security Question</p>
-                  <p className="text-sm font-medium text-slate-700">{question || SECURITY_QUESTIONS[0]}</p>
+                  {loading && !question
+                    ? <p className="text-sm text-slate-400 animate-pulse">Loading question…</p>
+                    : <p className="text-sm font-medium text-slate-700">{question}</p>
+                  }
                 </div>
                 <input
                   type="text"

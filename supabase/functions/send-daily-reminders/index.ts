@@ -10,7 +10,6 @@
 //
 // Deploy with: supabase functions deploy send-daily-reminders --no-verify-jwt
 // The --no-verify-jwt flag lets cron-job.org call this without a user token.
-// Security: protect with a shared secret header if needed.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // @deno-types="npm:@types/web-push@3.6.3"
@@ -28,6 +27,11 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
 Deno.serve(async (_req) => {
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+  // Threshold for "more than 2 days overdue" = due_date < (today - 2 days)
+  const thresholdDate = new Date();
+  thresholdDate.setDate(thresholdDate.getDate() - 2);
+  const thresholdStr = thresholdDate.toISOString().split("T")[0];
 
   // Fetch all push subscriptions
   const { data: subs, error: subErr } = await supabase
@@ -52,29 +56,42 @@ Deno.serve(async (_req) => {
     const loanIds = (loans ?? []).map((l: { loan_id: string }) => l.loan_id);
     if (!loanIds.length) continue;
 
-    // Get pending/partial payments due today or overdue
-    const { data: payments } = await supabase
+    // Due today
+    const { data: dueTodayRows } = await supabase
       .from("payments")
-      .select("due_date, payment_status")
+      .select("borrower_name")
       .in("loan_id", loanIds)
       .in("payment_status", ["Pending", "Partial"])
       .is("deleted_at", null)
-      .lte("due_date", today);
+      .eq("due_date", today);
 
-    if (!payments?.length) continue;
+    // Overdue more than 2 days (due_date strictly before threshold)
+    const { data: overdueRows } = await supabase
+      .from("payments")
+      .select("borrower_name")
+      .in("loan_id", loanIds)
+      .in("payment_status", ["Pending", "Partial"])
+      .is("deleted_at", null)
+      .lt("due_date", thresholdStr);
 
-    const dueToday = payments.filter((p: { due_date: string }) => p.due_date === today).length;
-    const overdue  = payments.filter((p: { due_date: string }) => p.due_date <  today).length;
+    const dueTodayCount = (dueTodayRows ?? []).length;
+    const overdueList   = (overdueRows ?? []) as { borrower_name: string }[];
 
-    let body = "";
-    if (dueToday > 0 && overdue > 0)      body = `${dueToday} payment(s) due today · ${overdue} overdue`;
-    else if (dueToday > 0)                 body = `${dueToday} payment(s) due today`;
-    else if (overdue  > 0)                 body = `${overdue} overdue payment(s) need attention`;
-    if (!body) continue;
+    if (!dueTodayCount && !overdueList.length) continue;
+
+    const lines: string[] = [];
+    if (dueTodayCount > 0) lines.push(`${dueTodayCount} payment(s) due today`);
+    if (overdueList.length > 0) {
+      const names   = [...new Set(overdueList.map((p) => p.borrower_name))];
+      const preview = names.length <= 2
+        ? names.join(" · ")
+        : `${names[0]} · ${names[1]} & ${names.length - 2} more`;
+      lines.push(`${overdueList.length} payment(s) overdue 3+ days: ${preview}`);
+    }
 
     const payload = JSON.stringify({
       title: "Loan Reminder",
-      body,
+      body: lines.join("\n"),
       url: "/LoanManager/",
     });
 
@@ -87,7 +104,6 @@ Deno.serve(async (_req) => {
     } catch (err: unknown) {
       const status = (err as { statusCode?: number }).statusCode;
       if (status === 410 || status === 404) {
-        // Subscription expired or unregistered — clean it up
         expired.push(sub.id);
       }
     }

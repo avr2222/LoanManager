@@ -1,12 +1,14 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
   Users, ShieldOff, ShieldCheck, RefreshCw,
-  UserPlus, Link2, Copy, Check, Trash2, Clock, X,
+  UserPlus, Link2, Copy, Check, Trash2, Clock, X, Bell,
 } from 'lucide-react';
 import { profilesService, type Profile } from '@/services/profilesService';
 import { invitationsService, type Invitation } from '@/services/invitationsService';
 import { useAuth } from '@/context/AuthContext';
 import { useLoans } from '@/context/LoanContext';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/common/Toast';
 
 type LoanRole = 'borrower' | 'mediator' | 'both';
 
@@ -171,7 +173,8 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
 // ── Main Page ─────────────────────────────────────────────────
 export function UsersPage() {
-  const { displayName } = useAuth();
+  const { displayName, isSuperAdmin } = useAuth();
+  const { showSuccess, showError } = useToast();
   const { loans } = useLoans();
 
   const [users, setUsers]             = useState<Profile[]>([]);
@@ -183,6 +186,7 @@ export function UsersPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [tab, setTab]                 = useState<'users' | 'invites'>('users');
+  const [testingPush, setTestingPush] = useState<string | null>(null);
 
   const { phoneToName, phoneToRole } = useMemo(() => {
     const nameMap = new Map<string, string>();
@@ -241,6 +245,25 @@ export function UsersPage() {
       );
     }
     setToggling(null);
+  }
+
+  async function handleTestPush(userId: string, userName: string) {
+    setTestingPush(userId);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-test-notification', {
+        body: { user_id: userId },
+      });
+      if (error) throw error;
+      if (data?.sent) {
+        showSuccess(`Test notification sent to ${userName}`);
+      } else {
+        showError(`${userName} has no push subscription`);
+      }
+    } catch {
+      showError('Failed to send test notification');
+    } finally {
+      setTestingPush(null);
+    }
   }
 
   async function handleRevoke(inv: Invitation) {
@@ -402,29 +425,45 @@ export function UsersPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {u.isSuperAdmin ? (
-                          <span className="text-xs text-indigo-500 font-semibold px-3 py-1.5">Admin</span>
-                        ) : (
-                          <button
-                            onClick={() => handleToggle(u)}
-                            disabled={toggling === u.id}
-                            title={u.isActive ? 'Disable user' : 'Enable user'}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors disabled:opacity-40 ${
-                              u.isActive
-                                ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                                : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                            }`}
-                          >
-                            {toggling === u.id ? (
-                              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                            ) : u.isActive ? (
-                              <ShieldOff size={13} />
-                            ) : (
-                              <ShieldCheck size={13} />
-                            )}
-                            {u.isActive ? 'Disable' : 'Enable'}
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => handleTestPush(u.id, u.fullName || u.phone)}
+                              disabled={testingPush === u.id}
+                              title="Send test push notification"
+                              className="inline-flex items-center gap-1 text-xs font-medium text-white bg-indigo-500 hover:bg-indigo-600 active:scale-95 px-2 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                            >
+                              {testingPush === u.id
+                                ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                : <Bell size={12} />
+                              }
+                              Test
+                            </button>
+                          )}
+                          {u.isSuperAdmin ? (
+                            <span className="text-xs text-indigo-500 font-semibold px-3 py-1.5">Admin</span>
+                          ) : (
+                            <button
+                              onClick={() => handleToggle(u)}
+                              disabled={toggling === u.id}
+                              title={u.isActive ? 'Disable user' : 'Enable user'}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors disabled:opacity-40 ${
+                                u.isActive
+                                  ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                                  : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                              }`}
+                            >
+                              {toggling === u.id ? (
+                                <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              ) : u.isActive ? (
+                                <ShieldOff size={13} />
+                              ) : (
+                                <ShieldCheck size={13} />
+                              )}
+                              {u.isActive ? 'Disable' : 'Enable'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
