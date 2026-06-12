@@ -10,10 +10,16 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { PaymentForm } from '@/components/payments/PaymentForm';
 import { PaymentTable } from '@/components/payments/PaymentTable';
 import { formatCurrency } from '@/utils/formatUtils';
-import { derivePaymentFields } from '@/services/calculationService';
+import { toISODateString } from '@/utils/dateUtils';
+import { derivePaymentFields, isOverduePayment } from '@/services/calculationService';
+import { exportPaymentsView } from '@/services/excelService';
 import { useAuth } from '@/context/AuthContext';
+import { useApp } from '@/context/AppContext';
+import { PageSkeleton } from '@/components/common/Skeleton';
+import { useTranslation } from 'react-i18next';
 
 export function PaymentsPage() {
+  const { loading } = useApp();
   const { payments, addPayment, updatePayment, deletePayment } = usePayments();
   const { loans } = useLoans();
   const { hasFullAccess, isAdmin, userPhone, phone, adminPhone } = useAuth();
@@ -53,23 +59,28 @@ export function PaymentsPage() {
   const visiblePayments = myLoanIds ? payments.filter((p) => myLoanIds.has(p.loanId)) : payments;
 
   const { showSuccess, showError } = useToast();
+  const { t } = useTranslation();
   const location = useLocation();
 
   const [showForm, setShowForm] = useState(false);
   const [defaultLoanId, setDefaultLoanId] = useState<string | undefined>();
   const [editingPayment, setEditingPayment] = useState<Payment | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'All' | 'Received' | 'Pending' | 'Overdue'>('All');
+  // Seed filter/search from navigation state (e.g. dashboard KPI card clicks)
+  // synchronously so PaymentTable mounts with them already applied
+  const navState = location.state as { openForm?: boolean; loanId?: string; filter?: 'All' | 'Received' | 'Pending' | 'Overdue'; search?: string } | null;
+  const [activeFilter, setActiveFilter] = useState<'All' | 'Received' | 'Pending' | 'Overdue'>(navState?.filter ?? 'All');
+  const [initialSearch] = useState(navState?.search ?? '');
 
   // Auto-open form when navigated here with a loanId (e.g. from Dashboard "Record" button)
   useEffect(() => {
-    const state = location.state as { openForm?: boolean; loanId?: string } | null;
+    const state = location.state as { openForm?: boolean; loanId?: string; filter?: string; search?: string } | null;
     if (state?.openForm) {
       setDefaultLoanId(state.loanId);
       setShowForm(true);
-      // Clear state so back-navigation doesn't re-open
-      window.history.replaceState({}, '');
     }
+    // Clear state so back-navigation doesn't re-apply it
+    if (state?.openForm || state?.filter || state?.search) window.history.replaceState({}, '');
   }, [location.state]);
 
   async function handleAdd(payment: Payment) {
@@ -93,21 +104,36 @@ export function PaymentsPage() {
     }
   }
 
+  function markPaidFields(payment: Payment): Payment {
+    return derivePaymentFields({
+      ...payment,
+      amountReceived: payment.netAmountExpected,
+      dateReceived: toISODateString(new Date()),
+      paymentStatus: 'Received',
+    });
+  }
+
   async function handleMarkPaid(id: string) {
     const payment = payments.find((p) => p.id === id);
     if (!payment) return;
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const updated = derivePaymentFields({
-      ...payment,
-      amountReceived: payment.netAmountExpected,
-      dateReceived: today,
-      paymentStatus: 'Received',
-    });
     try {
-      await updatePayment(updated);
+      await updatePayment(markPaidFields(payment));
       showSuccess(`${payment.borrowerName} — ${payment.monthYear} marked as paid`);
     } catch {
       showError('Failed to mark payment as paid');
+    }
+  }
+
+  async function handleBulkMarkPaid(ids: string[]) {
+    const targets = payments.filter((p) => ids.includes(p.id));
+    if (targets.length === 0) return;
+    try {
+      for (const payment of targets) {
+        await updatePayment(markPaidFields(payment));
+      }
+      showSuccess(t('payments.bulkMarkPaidSuccess', { count: targets.length }));
+    } catch {
+      showError('Failed to mark some payments as paid');
     }
   }
 
@@ -125,18 +151,21 @@ export function PaymentsPage() {
   const totalExpected = visiblePayments.reduce((s, p) => s + p.netAmountExpected, 0);
   const totalReceived = visiblePayments.reduce((s, p) => s + p.amountReceived, 0);
   const totalPending = visiblePayments.filter((p) => p.paymentStatus === 'Pending' || p.paymentStatus === 'Partial').reduce((s, p) => s + p.pendingAmount, 0);
-  const overdueCount = visiblePayments.filter((p) => p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived').length;
+  const overduePayments = visiblePayments.filter(isOverduePayment);
+  const overdueAmount = overduePayments.reduce((s, p) => s + p.pendingAmount, 0);
+
+  if (loading) return <PageSkeleton />;
 
   return (
     <div>
       {/* Summary — 2 cols on mobile, 4 on md — clickable to filter */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {([
-          { label: 'Total Expected', value: formatCurrency(totalExpected), color: 'text-slate-900',   bg: 'from-slate-50 to-white border-slate-200/60', filter: 'All'      as const },
-          { label: 'Total Received', value: formatCurrency(totalReceived), color: 'text-emerald-600', bg: 'from-emerald-50 to-white border-emerald-100', filter: 'Received' as const },
-          { label: 'Total Pending',  value: formatCurrency(totalPending),  color: 'text-amber-500',   bg: 'from-amber-50 to-white border-amber-100',     filter: 'Pending'  as const },
-          { label: 'Overdue',        value: overdueCount.toString(),        color: 'text-red-500',     bg: 'from-red-50 to-white border-red-100',         filter: 'Overdue'  as const },
-        ] as const).map(({ label, value, color, bg, filter }) => {
+          { label: 'Total Expected', value: formatCurrency(totalExpected), subtitle: '',                                                          color: 'text-slate-900',   bg: 'from-slate-50 to-white border-slate-200/60', filter: 'All'      as const },
+          { label: 'Total Received', value: formatCurrency(totalReceived), subtitle: '',                                                          color: 'text-emerald-600', bg: 'from-emerald-50 to-white border-emerald-100', filter: 'Received' as const },
+          { label: 'Total Pending',  value: formatCurrency(totalPending),  subtitle: '',                                                          color: 'text-amber-500',   bg: 'from-amber-50 to-white border-amber-100',     filter: 'Pending'  as const },
+          { label: 'Overdue',        value: formatCurrency(overdueAmount), subtitle: t('payments.paymentsCount', { count: overduePayments.length }), color: 'text-red-500',     bg: 'from-red-50 to-white border-red-100',         filter: 'Overdue'  as const },
+        ] as const).map(({ label, value, subtitle, color, bg, filter }) => {
           const isActive = activeFilter === filter;
           return (
             <button
@@ -146,6 +175,7 @@ export function PaymentsPage() {
             >
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight">{label}</p>
               <p className={`text-xl md:text-2xl font-bold mt-1.5 ${color}`}>{value}</p>
+              {subtitle && !isActive && <p className="text-[10px] text-slate-400 mt-1 font-medium">{subtitle}</p>}
               {isActive && <p className="text-[10px] text-indigo-400 mt-1 font-medium">Filtered ↑ click to clear</p>}
             </button>
           );
@@ -162,6 +192,9 @@ export function PaymentsPage() {
         ownedLoanIds={ownedLoanIds}
         canAdd={isAdmin || (ownedLoanIds !== undefined && ownedLoanIds.size > 0)}
         activeFilter={activeFilter}
+        initialSearch={initialSearch}
+        onBulkMarkPaid={hasFullAccess ? handleBulkMarkPaid : undefined}
+        onExport={(filtered) => { exportPaymentsView(filtered); showSuccess('Excel exported!'); }}
       />
 
       {/* Floating action button — mobile only */}

@@ -218,6 +218,35 @@ function parsePayments(wb: XLSX.WorkBook, loans: Loan[], warnings: string[]): Pa
   return deduped;
 }
 
+// ── Payment sheet (shared by full export and filtered-view export) ──────────
+
+const PAYMENT_EXPORT_HEADERS = [
+  'Loan ID', 'Borrower Name', 'Month-Year', 'Due Date',
+  'Expected (Rs)', 'Received (Rs)', 'Date Received',
+  'Status', 'Days Overdue', 'Pending (Rs)', 'Remarks',
+];
+
+function buildPaymentSheet(payments: Payment[]): XLSX.WorkSheet {
+  const payRows = [...payments]
+    .sort((a, b) => a.loanId.localeCompare(b.loanId) || compareMonthYear(a.monthYear, b.monthYear))
+    .map((p) => [
+      p.loanId, p.borrowerName, p.monthYear, formatDate(p.dueDate),
+      p.netAmountExpected, p.amountReceived,
+      p.dateReceived ? formatDate(p.dateReceived) : '',
+      p.paymentStatus, p.daysOverdue, p.pendingAmount, p.remarks ?? '',
+    ]);
+  const ws = XLSX.utils.aoa_to_sheet([PAYMENT_EXPORT_HEADERS, ...payRows]);
+  ws['!cols'] = PAYMENT_EXPORT_HEADERS.map(() => ({ wch: 20 }));
+  return ws;
+}
+
+/** Exports just the given payments (e.g. the currently filtered table view). */
+export function exportPaymentsView(payments: Payment[]): void {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, buildPaymentSheet(payments), 'Payments');
+  XLSX.writeFile(wb, `Payments_${toISODateString(new Date())}.xlsx`);
+}
+
 // ── User Report (Loans Given / Taken / Mediated) ─────────────────────────────
 
 export function exportUserReport(
@@ -297,21 +326,7 @@ export function exportUserReport(
 
   // ── Sheet 4: Payment History ──
   if (payments.length > 0) {
-    const payHeaders = [
-      'Loan ID', 'Borrower Name', 'Month-Year', 'Due Date',
-      'Expected (Rs)', 'Received (Rs)', 'Date Received',
-      'Status', 'Days Overdue', 'Pending (Rs)', 'Remarks',
-    ];
-    const payRows = payments
-      .sort((a, b) => a.loanId.localeCompare(b.loanId) || compareMonthYear(a.monthYear, b.monthYear))
-      .map((p) => [
-        p.loanId, p.borrowerName, p.monthYear, formatDate(p.dueDate),
-        p.netAmountExpected, p.amountReceived,
-        p.dateReceived ? formatDate(p.dateReceived) : '',
-        p.paymentStatus, p.daysOverdue, p.pendingAmount, p.remarks ?? '',
-      ]);
-    const ws = XLSX.utils.aoa_to_sheet([payHeaders, ...payRows]);
-    ws['!cols'] = payHeaders.map(() => ({ wch: 20 }));
+    const ws = buildPaymentSheet(payments);
     XLSX.utils.book_append_sheet(wb, ws, 'Payment History');
   }
 

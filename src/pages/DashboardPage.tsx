@@ -12,10 +12,13 @@ import { WhatsAppButton } from '@/components/common/WhatsAppButton';
 import { overdueMessage, dueMessage } from '@/utils/whatsappUtils';
 import { computeKPIs } from '@/services/calculationService';
 import { formatCurrency, formatDate, formatMonthYear } from '@/utils/formatUtils';
+import { trimLeadingEmpty } from '@/utils/chartUtils';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { MediatorDashboardPage } from '@/pages/MediatorDashboardPage';
 import { exportAdminPDF } from '@/services/pdfService';
+import { useApp } from '@/context/AppContext';
+import { PageSkeleton } from '@/components/common/Skeleton';
 
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -59,6 +62,7 @@ export function DashboardPage() {
   const { loans } = useLoans();
   const { payments } = usePayments();
   const { displayName, profile } = useAuth();
+  const { loading } = useApp();
   const navigate = useNavigate();
   const [viewAsPhone, setViewAsPhone] = useState('');
   const [showUserPicker, setShowUserPicker] = useState(false);
@@ -72,7 +76,7 @@ export function DashboardPage() {
 
   const monthlyData = useMemo(() => {
     const now = new Date();
-    return Array.from({ length: 6 }, (_, i) => {
+    const months = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
       const label = formatMonthYear(d);
       const mp = payments.filter((p) => p.monthYear === label);
@@ -85,6 +89,8 @@ export function DashboardPage() {
         Rate: exp > 0 ? Math.round((rec / exp) * 100) : 0,
       };
     });
+    // Don't waste chart space on empty months before the data starts
+    return trimLeadingEmpty(months, (m) => m.Expected > 0 || m.Received > 0);
   }, [payments]);
 
   const thisMonthStats = useMemo(() => {
@@ -117,6 +123,13 @@ export function DashboardPage() {
       .slice(0, 10);
   }, [payments]);
 
+  // Distinct borrowers, not loans — one borrower can have several loans
+  const uniqueBorrowerCount = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of loans) set.add(l.borrowerPhone?.replace(/\D/g, '').slice(-10) || l.borrowerName);
+    return set.size;
+  }, [loans]);
+
   // Collect all unique phone users from loans
   const knownUsers = useMemo(() => {
     const map = new Map<string, string>(); // phone → name
@@ -133,6 +146,8 @@ export function DashboardPage() {
   function recordPayment(loanId: string) {
     navigate('/payments', { state: { openForm: true, loanId } });
   }
+
+  if (loading) return <PageSkeleton />;
 
   // Render the selected user's dashboard
   if (viewAsPhone) {
@@ -162,16 +177,22 @@ export function DashboardPage() {
 
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <KPICard title="Active Loans"  value={String(kpis.totalActiveLoans)}                subtitle={`${loans.length} total`} />
-        <KPICard title="Principal"     value={formatCurrency(kpis.totalPrincipalOutstanding)} accent="default" />
-        <KPICard title="Mthly Expected" value={formatCurrency(kpis.monthlyInterestExpected)} />
-        <KPICard title="Net Income"    value={formatCurrency(kpis.netMonthlyIncome)}          accent="green" subtitle="after commission" />
-        <KPICard title="Overdue"       value={String(kpis.totalOverduePayments)}              accent="red"   subtitle={kpis.totalPendingAmount > 0 ? formatCurrency(kpis.totalPendingAmount) + ' pending' : undefined} />
-        <KPICard title="Borrowers"     value={String(loans.length)} />
+        <KPICard title="Active Loans"  value={String(kpis.totalActiveLoans)}                subtitle={`${loans.length} total`} onClick={() => navigate('/loans')} />
+        <KPICard title="Principal"     value={formatCurrency(kpis.totalPrincipalOutstanding)} accent="default" onClick={() => navigate('/loans')} />
+        <KPICard title="Mthly Expected" value={formatCurrency(kpis.monthlyInterestExpected)} onClick={() => navigate('/payments')} />
+        <KPICard title="Net Income"    value={formatCurrency(kpis.netMonthlyIncome)}          accent="green" subtitle="after commission" onClick={() => navigate('/payments')} />
+        <KPICard title="Overdue"       value={String(kpis.totalOverduePayments)}              accent="red"   subtitle={kpis.totalPendingAmount > 0 ? formatCurrency(kpis.totalPendingAmount) + ' pending' : undefined} onClick={() => navigate('/payments', { state: { filter: 'Overdue' } })} />
+        <KPICard title="Borrowers"     value={String(uniqueBorrowerCount)} onClick={() => navigate('/loans')} />
       </div>
 
-      {/* This Month Collection */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-5">
+      {/* This Month Collection — click to open this month's payments */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/payments', { state: { search: formatMonthYear(new Date()) } })}
+        onKeyDown={(e) => { if (e.key === 'Enter') navigate('/payments', { state: { search: formatMonthYear(new Date()) } }); }}
+        className="bg-white rounded-2xl border border-slate-100 p-5 cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all"
+      >
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
             {thisMonthStats.label} — Collection Progress
@@ -252,8 +273,14 @@ export function DashboardPage() {
 
         {/* Overdue */}
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-50">
+          <div className="px-5 py-4 border-b border-slate-50 flex items-center justify-between">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Top Overdue Payments</p>
+            <button
+              onClick={() => navigate('/payments', { state: { filter: 'Overdue' } })}
+              className="text-xs font-medium text-indigo-500 hover:text-indigo-700 hover:underline"
+            >
+              View all
+            </button>
           </div>
           {overduePayments.length === 0 ? (
             <div className="flex items-center justify-center py-10 text-sm text-slate-400">No overdue payments</div>
@@ -316,8 +343,14 @@ export function DashboardPage() {
 
         {/* Upcoming */}
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-50">
+          <div className="px-5 py-4 border-b border-slate-50 flex items-center justify-between">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Upcoming Dues — Next 7 Days</p>
+            <button
+              onClick={() => navigate('/payments', { state: { filter: 'Pending' } })}
+              className="text-xs font-medium text-indigo-500 hover:text-indigo-700 hover:underline"
+            >
+              View all
+            </button>
           </div>
           {upcomingDues.length === 0 ? (
             <div className="flex items-center justify-center py-10 text-sm text-slate-400">No upcoming dues</div>

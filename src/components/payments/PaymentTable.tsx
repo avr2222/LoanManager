@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Edit2, Trash2, Plus, Search, ChevronUp, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Edit2, Trash2, Plus, Search, ChevronUp, ChevronDown, CheckCircle2, Download } from 'lucide-react';
 import type { Payment, PaymentStatus } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -26,18 +27,26 @@ interface PaymentTableProps {
   canAdd?: boolean;
   /** Controlled status filter driven by parent (e.g. card clicks) */
   activeFilter?: FilterValue;
+  /** Seeds the search box once (e.g. a monthYear passed via navigation state) */
+  initialSearch?: string;
+  /** When provided, shows row checkboxes and a bulk "Mark Paid (n)" action bar */
+  onBulkMarkPaid?: (ids: string[]) => void | Promise<void>;
+  /** When provided, shows an Export button that receives the currently filtered rows */
+  onExport?: (filtered: Payment[]) => void;
 }
 
 type SortKey = 'monthYear' | 'loanId' | 'borrowerName' | 'netAmountExpected' | 'amountReceived' | 'daysOverdue' | 'paymentStatus' | 'dueDate';
 
-export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, readOnly, ownedLoanIds, canAdd = true, activeFilter }: PaymentTableProps) {
+export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, readOnly, ownedLoanIds, canAdd = true, activeFilter, initialSearch, onBulkMarkPaid, onExport }: PaymentTableProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { profileMap } = useApp();
   const { loans } = useLoans();
   // A row is editable if readOnly is false AND (no ownedLoanIds filter, or the payment's loan is owned by the current user)
   const canAct = (p: Payment) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(p.loanId));
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch ?? '');
   const [statusFilter, setStatusFilter] = useState<FilterValue>('All');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>('dueDate');
   const [sortAsc, setSortAsc] = useState(true);
   const [page, setPage] = useState(1);           // desktop pagination
@@ -102,6 +111,38 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
     setMobilePage(1);
   }
 
+  // ── Bulk selection (desktop) ─────────────────────────────────
+  const bulkEnabled = !readOnly && !!onBulkMarkPaid;
+  const eligibleForBulk = (p: Payment) => canAct(p) && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived';
+  const pageEligible = paged.filter(eligibleForBulk);
+  const allPageSelected = pageEligible.length > 0 && pageEligible.every((p) => selected.has(p.id));
+  // Selection survives page changes but not filter/search changes (handled in their onChange)
+  const selectedEligibleIds = filtered.filter((p) => selected.has(p.id) && eligibleForBulk(p)).map((p) => p.id);
+
+  function toggleRow(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function togglePageSelection() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageEligible.forEach((p) => next.delete(p.id));
+      else pageEligible.forEach((p) => next.add(p.id));
+      return next;
+    });
+  }
+
+  async function handleBulkMarkPaid() {
+    if (!onBulkMarkPaid || selectedEligibleIds.length === 0) return;
+    await onBulkMarkPaid(selectedEligibleIds);
+    setSelected(new Set());
+  }
+
   function SortIcon({ col }: { col: SortKey }) {
     if (sortKey !== col) return null;
     return sortAsc ? <ChevronUp size={12} /> : <ChevronDown size={12} />;
@@ -138,13 +179,13 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
             type="text"
             placeholder="Search..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); setMobilePage(1); }}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); setMobilePage(1); setSelected(new Set()); }}
             className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value as FilterValue); setPage(1); setMobilePage(1); }}
+          onChange={(e) => { setStatusFilter(e.target.value as FilterValue); setPage(1); setMobilePage(1); setSelected(new Set()); }}
           className="px-2 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none"
         >
           <option value="All">All</option>
@@ -154,6 +195,16 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
           <option value="Partial">Partial</option>
           <option value="Waived">Waived</option>
         </select>
+        {onExport && (
+          <button
+            onClick={() => onExport(filtered)}
+            title={t('payments.exportFiltered')}
+            className="hidden md:flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shrink-0"
+          >
+            <Download size={15} />
+            <span className="hidden lg:inline">{t('common.export')}</span>
+          </button>
+        )}
         {!readOnly && (
           <button
             onClick={canAdd ? onAdd : undefined}
@@ -212,11 +263,11 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                   </div>
                   <div>
                     <p className="text-slate-400">Received</p>
-                    <p className="font-semibold text-emerald-600">{p.amountReceived > 0 ? formatCurrency(p.amountReceived) : '—'}</p>
+                    <p className={`font-semibold ${p.amountReceived > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>{p.amountReceived > 0 ? formatCurrency(p.amountReceived) : '—'}</p>
                   </div>
                   <div>
                     <p className="text-slate-400">Pending</p>
-                    <p className="font-semibold text-red-500">{p.pendingAmount > 0 ? formatCurrency(p.pendingAmount) : '—'}</p>
+                    <p className={`font-semibold ${p.pendingAmount > 0 ? 'text-red-500' : 'text-slate-300'}`}>{p.pendingAmount > 0 ? formatCurrency(p.pendingAmount) : '—'}</p>
                   </div>
                 </div>
                 <div className="flex items-center justify-between mt-2">
@@ -248,12 +299,43 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
             )}
           </div>
 
+          {/* Bulk action bar — desktop */}
+          {bulkEnabled && selectedEligibleIds.length > 0 && (
+            <div className="hidden md:flex items-center gap-3 mb-3 px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl">
+              <span className="text-sm font-medium text-indigo-700">{t('payments.selectedCount', { count: selectedEligibleIds.length })}</span>
+              <button
+                onClick={handleBulkMarkPaid}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg hover:bg-emerald-100"
+              >
+                <CheckCircle2 size={13} /> {t('payments.markPaidSelected', { count: selectedEligibleIds.length })}
+              </button>
+              <button
+                onClick={() => setSelected(new Set())}
+                className="px-3 py-1.5 text-xs font-medium text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+              >
+                {t('common.clear')}
+              </button>
+            </div>
+          )}
+
           {/* Desktop table view */}
           <div className="hidden md:block bg-white rounded-2xl border border-slate-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-slate-100">
+                    {bulkEnabled && (
+                      <th className="px-4 py-3 w-8">
+                        <input
+                          type="checkbox"
+                          aria-label="Select all on page"
+                          checked={allPageSelected}
+                          disabled={pageEligible.length === 0}
+                          onChange={togglePageSelection}
+                          className="rounded border-slate-300 text-indigo-500 focus:ring-indigo-400"
+                        />
+                      </th>
+                    )}
                     {th('loanId', 'Loan')}
                     {th('borrowerName', 'Borrower')}
                     {th('monthYear', 'Month')}
@@ -269,13 +351,26 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                 <tbody className="divide-y divide-slate-50">
                   {paged.map((p) => (
                     <tr key={p.id} className={`hover:bg-slate-50/60 transition-colors ${p.daysOverdue > 0 ? 'bg-red-50/40' : ''}`}>
+                      {bulkEnabled && (
+                        <td className="px-4 py-3">
+                          {eligibleForBulk(p) && (
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${p.loanId} ${p.monthYear}`}
+                              checked={selected.has(p.id)}
+                              onChange={() => toggleRow(p.id)}
+                              className="rounded border-slate-300 text-indigo-500 focus:ring-indigo-400"
+                            />
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3"><button onClick={() => navigate(`/loans/${p.loanId}`)} className="text-xs font-mono font-semibold text-indigo-500 hover:underline">{p.loanId}</button></td>
                       <td className="px-4 py-3 text-sm text-slate-700">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{p.monthYear}</td>
                       <td className="px-4 py-3 text-sm text-slate-500">{formatDate(p.dueDate)}</td>
                       <td className="px-4 py-3 text-sm font-medium text-slate-800">{formatCurrency(p.netAmountExpected)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{p.amountReceived > 0 ? formatCurrency(p.amountReceived) : '—'}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-red-500">{p.pendingAmount > 0 ? formatCurrency(p.pendingAmount) : '—'}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{p.amountReceived > 0 ? formatCurrency(p.amountReceived) : <span className="text-xs text-slate-300">—</span>}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-red-500">{p.pendingAmount > 0 ? formatCurrency(p.pendingAmount) : <span className="text-xs font-normal text-slate-300">—</span>}</td>
                       <td className="px-4 py-3">
                         {p.daysOverdue > 0 ? (
                           <span className="text-xs font-medium text-red-500 bg-red-50 px-2 py-0.5 rounded-full">{p.daysOverdue}d</span>

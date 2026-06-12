@@ -11,6 +11,8 @@ import type { Loan } from '@/types';
 import { usePayments } from '@/context/PaymentContext';
 import { useAuth } from '@/context/AuthContext';
 import { formatCurrency, formatDate, ordinal, formatRateAsRupees, formatMonthYear } from '@/utils/formatUtils';
+import { trimLeadingEmpty } from '@/utils/chartUtils';
+import { PageSkeleton } from '@/components/common/Skeleton';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { useToast } from '@/components/common/Toast';
 import { WhatsAppButton } from '@/components/common/WhatsAppButton';
@@ -50,16 +52,25 @@ const kpiBgMap: Record<KpiColor, string> = {
   green:   'bg-emerald-50 border-emerald-100',
   red:     'bg-red-50 border-red-100',
 };
-function KpiCard({ label, value, color = 'default', sub, wide }: { label: string; value: string; color?: KpiColor; sub?: string; wide?: boolean }) {
-  return (
-    <div className={`rounded-2xl border px-4 py-4 ${wide ? `${kpiBgMap[color]} flex sm:block items-center justify-between gap-3` : 'bg-white border-slate-100'}`}>
+function KpiCard({ label, value, color = 'default', sub, wide, onClick }: { label: string; value: string; color?: KpiColor; sub?: string; wide?: boolean; onClick?: () => void }) {
+  const baseClass = `rounded-2xl border px-4 py-4 ${wide ? `${kpiBgMap[color]} flex sm:block items-center justify-between gap-3` : 'bg-white border-slate-100'}`;
+  const content = (
+    <>
       <div>
         <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight">{label}</p>
         {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
       </div>
       <p className={`font-bold shrink-0 ${kpiColorMap[color]} ${wide ? 'text-2xl sm:mt-1.5' : 'text-xl mt-1.5'}`}>{value}</p>
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button onClick={onClick} className={`${baseClass} text-left w-full cursor-pointer hover:shadow-md hover:border-indigo-200 hover:-translate-y-0.5 transition-all`}>
+        {content}
+      </button>
+    );
+  }
+  return <div className={baseClass}>{content}</div>;
 }
 
 interface BorrowerGroup {
@@ -77,7 +88,7 @@ export function MediatorDashboardPage() {
   const { loans, updateLoan, deleteLoan } = useLoans();
   const { payments, updatePayment, deletePaymentsByLoan } = usePayments();
   const { userPhone, hasFullAccess, isAdmin, profile, phone: profilePhone, adminPhone } = useAuth();
-  const { profileMap } = useApp();
+  const { profileMap, loading } = useApp();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -272,7 +283,7 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
   // ── Monthly Expected vs Received chart (last 6 months) ──────
   const monthlyChartData = useMemo(() => {
     const now = new Date();
-    return Array.from({ length: 6 }, (_, i) => {
+    const months = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
       // Use formatMonthYear so keys match payment.monthYear exactly ("May-2026")
       const key = formatMonthYear(d);
@@ -298,7 +309,9 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         Rate: expected > 0 ? Math.round((received / expected) * 100) : 0,
       };
     });
-  }, [myPayments, lenderLoanIds, mediatorLoans, borrowerLoanIds]);
+    // Don't waste chart space on empty months before the data starts
+    return trimLeadingEmpty(months, (m) => m.Expected > 0 || m.Received > 0 || m.Commission > 0 || m.Due > 0);
+  }, [myPayments, lenderLoanIds, mediatorLoans, borrowerLoanIds, isAdmin, isViewAs]);
 
   const showChart = (hasLender || hasMediator || hasBorrower) &&
     monthlyChartData.some((d) => d.Expected > 0 || d.Commission > 0 || d.Due > 0);
@@ -368,6 +381,8 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
     const name = viewAsName || userPhone;
     exportUserPDF(name, lenderLoans, borrowerLoans, mediatorLoans, myPayments);
   }
+
+  if (loading) return <PageSkeleton />;
 
   return (
     <>
@@ -478,11 +493,12 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest -mb-1">As Lender</p>
           <div className="grid grid-cols-2 gap-3">
             <KpiCard label={t('dashboard.loansGiven')}  value={String(lenderLoans.length)}
-              sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} />
-            <KpiCard label={t('dashboard.totalLent')}   value={formatCurrency(totalLentPrincipal)} color="indigo" />
-            <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" />
+              sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} onClick={() => navigate('/loans')} />
+            <KpiCard label={t('dashboard.totalLent')}   value={formatCurrency(totalLentPrincipal)} color="indigo" onClick={() => navigate('/loans')} />
+            <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" onClick={() => navigate('/payments')} />
             <KpiCard label={t('dashboard.overdue')}     value={String(overdueCount)} color="red"
-              sub={overdueCount > 0 ? t('dashboard.paymentsLate') : t('dashboard.allOnTime')} />
+              sub={overdueCount > 0 ? t('dashboard.paymentsLate') : t('dashboard.allOnTime')}
+              onClick={() => navigate('/payments', { state: { filter: 'Overdue' } })} />
           </div>
         </>
       ) : hasLender ? (
@@ -490,10 +506,10 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest -mb-1">As Lender</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <KpiCard label={t('dashboard.loansGiven')}  value={String(lenderLoans.length)}
-              sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} />
-            <KpiCard label={t('dashboard.totalLent')}   value={formatCurrency(totalLentPrincipal)} color="indigo" />
+              sub={t('dashboard.borrowers', { count: lenderByBorrower.length })} onClick={() => navigate('/loans')} />
+            <KpiCard label={t('dashboard.totalLent')}   value={formatCurrency(totalLentPrincipal)} color="indigo" onClick={() => navigate('/loans')} />
             <div className="col-span-2 sm:col-span-1">
-              <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" wide />
+              <KpiCard label={t('dashboard.monthlyIncome')} value={formatCurrency(monthlyLendIncome)} color="green" wide onClick={() => navigate('/payments')} />
             </div>
           </div>
           {!hasMediator && (
@@ -547,9 +563,15 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
         </div>
       )}
 
-      {/* ── This Month Collection ── */}
+      {/* ── This Month Collection — click to open this month's payments ── */}
       {thisMonthStats.expected > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate('/payments', { state: { search: formatMonthYear(new Date()) } })}
+          onKeyDown={(e) => { if (e.key === 'Enter') navigate('/payments', { state: { search: formatMonthYear(new Date()) } }); }}
+          className="bg-white rounded-2xl border border-slate-100 p-5 cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all"
+        >
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
               {thisMonthStats.label} — Collection Progress
@@ -700,9 +722,17 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               <p className="text-xs font-semibold text-red-700 uppercase tracking-widest">{t('payments.overduePayments')}</p>
             </div>
-            <span className="text-xs font-bold text-white bg-red-500 px-2 py-0.5 rounded-full">
-              {overduePayments.length}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/payments', { state: { filter: 'Overdue' } })}
+                className="text-xs font-medium text-red-600 hover:text-red-800 hover:underline"
+              >
+                {t('common.viewAll')}
+              </button>
+              <span className="text-xs font-bold text-white bg-red-500 px-2 py-0.5 rounded-full">
+                {overduePayments.length}
+              </span>
+            </div>
           </div>
 
           <div className="divide-y divide-slate-50">
@@ -768,9 +798,17 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
               <span className="w-2 h-2 rounded-full bg-amber-400" />
               <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">{t('payments.upcomingPayments')}</p>
             </div>
-            <span className="text-xs font-bold text-white bg-amber-500 px-2 py-0.5 rounded-full">
-              {upcomingPayments.length}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/payments', { state: { filter: 'Pending' } })}
+                className="text-xs font-medium text-amber-700 hover:text-amber-900 hover:underline"
+              >
+                {t('common.viewAll')}
+              </button>
+              <span className="text-xs font-bold text-white bg-amber-500 px-2 py-0.5 rounded-full">
+                {upcomingPayments.length}
+              </span>
+            </div>
           </div>
 
           <div className="divide-y divide-slate-50">

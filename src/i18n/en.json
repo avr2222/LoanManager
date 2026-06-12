@@ -136,7 +136,12 @@
     "borrower": "Borrower",
     "lenderContext": "Lender: {{name}}",
     "loansOverdue": "loans overdue",
-    "allOnTime": "all on time"
+    "allOnTime": "all on time",
+    "exportFiltered": "Export the currently filtered rows to Excel",
+    "selectedCount": "{{count}} selected",
+    "markPaidSelected": "Mark Paid ({{count}})",
+    "bulkMarkPaidSuccess": "{{count}} payment(s) marked as paid",
+    "paymentsCount": "{{count}} payment(s)"
   },
   "dashboard": {
     "loansGiven": "Loans Given",
@@ -195,6 +200,9 @@
     "prev": "Prev",
     "next": "Next",
     "allShown": "All {{count}} loans shown",
-    "loadingMore": "Loading more…"
+    "loadingMore": "Loading more…",
+    "export": "Export",
+    "clear": "Clear",
+    "viewAll": "View all"
   }
 }

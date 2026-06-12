@@ -10,11 +10,14 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { LoanForm } from '@/components/loans/LoanForm';
 import { LoanTable } from '@/components/loans/LoanTable';
 import { useAuth } from '@/context/AuthContext';
+import { useApp } from '@/context/AppContext';
+import { PageSkeleton } from '@/components/common/Skeleton';
 
 type RoleFilter = 'MyLoans' | 'All' | 'Lender' | 'Borrower' | 'Mediator';
 
 export function LoansPage() {
   const { t } = useTranslation();
+  const { loading } = useApp();
   const { loans, addLoan, updateLoan, deleteLoan, setLoanStatus } = useLoans();
   const { isAdmin, hasFullAccess, userPhone, displayName, phone, adminPhone, user } = useAuth();
   const { deletePaymentsByLoan } = usePayments();
@@ -123,6 +126,8 @@ export function LoansPage() {
 
   const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
 
+  if (loading) return <PageSkeleton />;
+
   return (
     <div>
       {/* Summary strip */}
@@ -151,7 +156,7 @@ export function LoansPage() {
             onChange={(e) => setLenderFilter(e.target.value)}
             className="text-sm border border-slate-200 rounded-xl px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
           >
-            <option value="">{t('loans.allLenders', { count: loans.length })}</option>
+            <option value="">{t('loans.allLenders', { count: knownLenders.length })}</option>
             {knownLenders.map(({ phone, name }) => (
               <option key={phone} value={phone}>
                 {name} — {phone}

@@ -237,7 +237,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
           <div className="hidden md:block bg-white rounded-2xl border border-slate-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-slate-100">
                     <th className={thClass} onClick={() => toggleSort('loanId')}><span className="flex items-center gap-1">{t('loans.loanId')} <SortIcon col="loanId" /></span></th>
                     <th className={thClass} onClick={() => toggleSort('borrowerName')}><span className="flex items-center gap-1">{counterpartyLabel} <SortIcon col="borrowerName" /></span></th>
