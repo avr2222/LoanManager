@@ -1,5 +1,5 @@
 import type { Loan, Payment, DashboardKPIs } from '@/types';
-import { daysBetween, getDueDateForMonth, toISODateString } from '@/utils/dateUtils';
+import { daysBetween, getDueDateForMonth, toISODateString, parseISODateLocal } from '@/utils/dateUtils';
 import { formatMonthYear } from '@/utils/formatUtils';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,8 +13,8 @@ export function deriveLoanFields(input: LoanInput): Loan {
       ? (monthlyInterestAmount * (input.mediatorCommissionPct ?? 0)) / 100
       : 0;
   const netMonthlyReceipt = monthlyInterestAmount - mediatorMonthlyShare;
-  const dateObj = input.dateGiven ? new Date(input.dateGiven) : new Date();
-  const monthlyDueDay = isNaN(dateObj.getTime()) ? 1 : dateObj.getDate();
+  const dateObj = input.dateGiven ? parseISODateLocal(input.dateGiven) : new Date();
+  const monthlyDueDay = dateObj?.getDate() ?? 1;
 
   return {
     ...input,
@@ -69,11 +69,15 @@ export function generateMonthlyPayment(loan: Loan, year: number, month: number):
   return derivePaymentFields(payment);
 }
 
+/** Overdue = past due and money still outstanding (Pending/Partial/Claimed).
+ *  Single source of truth — Sidebar badges and table filters use the same rule. */
+export function isOverduePayment(p: Pick<Payment, 'daysOverdue' | 'paymentStatus'>): boolean {
+  return p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived';
+}
+
 export function computeKPIs(loans: Loan[], payments: Payment[]): DashboardKPIs {
   const activeLoans = loans.filter((l) => l.loanStatus === 'Active');
-  const overduePayments = payments.filter(
-    (p) => p.paymentStatus === 'Pending' && p.daysOverdue > 0
-  );
+  const overduePayments = payments.filter(isOverduePayment);
 
   return {
     totalActiveLoans: activeLoans.length,

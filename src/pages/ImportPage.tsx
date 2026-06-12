@@ -13,6 +13,7 @@ export function ImportPage() {
   const [loading, setLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [confirmText, setConfirmText] = useState('');
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
 
   async function handleFile(file: File) {
     if (!file.name.match(/\.xlsx?$/i)) {
@@ -20,9 +21,15 @@ export function ImportPage() {
       return;
     }
     setLoading(true);
+    setImportWarnings([]);
     try {
-      await importFile(file);
-      showSuccess('Data imported successfully into Supabase!');
+      const { warnings } = await importFile(file);
+      setImportWarnings(warnings);
+      showSuccess(
+        warnings.length > 0
+          ? `Imported with ${warnings.length} warning(s) — review below.`
+          : 'Data imported successfully into Supabase!'
+      );
     } catch (err) {
       showError('Import failed. Check the file format matches the Loan Tracker template.');
       console.error(err);
@@ -95,6 +102,19 @@ export function ImportPage() {
           )}
         </div>
         <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
+
+        {importWarnings.length > 0 && (
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold text-amber-800 mb-2">
+              <AlertTriangle size={15} /> Import warnings ({importWarnings.length})
+            </p>
+            <ul className="space-y-1 text-xs text-amber-700 list-disc list-inside max-h-48 overflow-y-auto">
+              {importWarnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Export */}

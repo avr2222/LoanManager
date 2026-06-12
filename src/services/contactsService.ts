@@ -4,11 +4,13 @@ import { supabase } from '@/lib/supabase';
 // Invalidated after writes and after 60 s.
 let _cache: Contact[] | null = null;
 let _cacheTime = 0;
+let _pending: Promise<Contact[]> | null = null;
 const CACHE_TTL_MS = 60_000;
 
 function invalidateCache() {
   _cache = null;
   _cacheTime = 0;
+  _pending = null;
 }
 
 export interface Contact {
@@ -34,15 +36,24 @@ function fromDb(row: Record<string, unknown>): Contact {
 export const contactsService = {
   async list(): Promise<Contact[]> {
     if (_cache && Date.now() - _cacheTime < CACHE_TTL_MS) return _cache;
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .order('name');
-    if (error) return _cache ?? [];
-    const result = (data as Record<string, unknown>[]).map(fromDb);
-    _cache = result;
-    _cacheTime = Date.now();
-    return result;
+    // Dedupe concurrent callers onto one in-flight request
+    if (_pending) return _pending;
+    _pending = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('contacts')
+          .select('*')
+          .order('name');
+        if (error) return _cache ?? [];
+        const result = (data as Record<string, unknown>[]).map(fromDb);
+        _cache = result;
+        _cacheTime = Date.now();
+        return result;
+      } finally {
+        _pending = null;
+      }
+    })();
+    return _pending;
   },
 
   async upsert(name: string, phone: string, notes?: string): Promise<{ error: string | null }> {

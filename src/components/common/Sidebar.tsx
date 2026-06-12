@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { usePayments } from '@/context/PaymentContext';
 import { useLoans } from '@/context/LoanContext';
+import { isOverduePayment } from '@/services/calculationService';
 
 export function Sidebar() {
   const { t } = useTranslation();
@@ -12,10 +13,7 @@ export function Sidebar() {
   const { payments } = usePayments();
   const { loans } = useLoans();
 
-  const isOverdue = (p: { daysOverdue: number; paymentStatus: string }) =>
-    p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived';
-
-  const allOverdueCount = payments.filter(isOverdue).length;
+  const allOverdueCount = payments.filter(isOverduePayment).length;
 
   const myOverdueCount = useMemo(() => {
     if (!isAdmin) return allOverdueCount;
@@ -27,7 +25,7 @@ export function Sidebar() {
         .filter((l) => norm(l.lenderPhone) === myPhone || norm(l.mediatorPhone) === myPhone)
         .map((l) => l.loanId)
     );
-    return payments.filter((p) => myLoanIds.has(p.loanId) && isOverdue(p)).length;
+    return payments.filter((p) => myLoanIds.has(p.loanId) && isOverduePayment(p)).length;
   }, [isAdmin, phone, adminPhone, loans, payments, allOverdueCount]);
 
   const commonNav = [

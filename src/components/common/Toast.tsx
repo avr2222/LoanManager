@@ -32,7 +32,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showSuccess: (m) => addToast(m, 'success'), showError: (m) => addToast(m, 'error') }}>
       {children}
-      <div className="fixed bottom-20 sm:bottom-5 right-4 left-4 sm:left-auto z-50 flex flex-col gap-2">
+      {/* BottomNav is visible below md, so the toast stays above it until md */}
+      <div className="fixed bottom-20 md:bottom-5 right-4 left-4 sm:left-auto z-50 flex flex-col gap-2">
         {toasts.map((toast) => (
           <div
             key={toast.id}

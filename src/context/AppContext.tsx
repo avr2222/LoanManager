@@ -44,7 +44,7 @@ function buildMissingPayments(loans: Loan[], existingPayments: Payment[]): Payme
 interface AppContextValue {
   loading: boolean;
   autoImporting: boolean;
-  importFile: (file: File) => Promise<void>;
+  importFile: (file: File) => Promise<{ warnings: string[] }>;
   exportData: () => void;
   clearAllData: () => Promise<void>;
   profileMap: Map<string, string>;
@@ -172,7 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loans.length]); // loans.length — fires only on add/delete, not on edit
 
-  const importFile = useCallback(async (file: File) => {
+  const importFile = useCallback(async (file: File): Promise<{ warnings: string[] }> => {
     const result = await importFromExcel(file);
     console.log('[Import] Parsed:', result.loans.length, 'loans,', result.payments.length, 'payments');
 
@@ -189,6 +189,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     bulkLoadLoans(result.loans);
     bulkLoadPayments(result.payments);
+    return { warnings: result.warnings };
   }, [bulkLoadLoans, bulkLoadPayments]);
 
   const exportData = useCallback(() => {

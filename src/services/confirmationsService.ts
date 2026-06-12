@@ -45,9 +45,10 @@ export const confirmationsService = {
   },
 
   async confirm(confirmationId: string): Promise<{ error: string | null }> {
+    // Don't touch `note` — overwriting it would wipe any existing dispute note
     const { error } = await supabase
       .from('loan_party_confirmations')
-      .update({ status: 'Confirmed', responded_at: new Date().toISOString(), note: '' })
+      .update({ status: 'Confirmed', responded_at: new Date().toISOString() })
       .eq('id', confirmationId);
     if (error) return { error: error.message };
     return { error: null };

@@ -1,22 +1,38 @@
 import { describe, it, expect } from 'vitest';
-import { daysBetween, isOverdue, getDueDateForMonth, toISODateString, parseExcelDate } from '../dateUtils';
+import {
+  daysBetween,
+  isOverdue,
+  getDueDateForMonth,
+  toISODateString,
+  parseExcelDate,
+  parseISODateLocal,
+  parseMonthYear,
+  compareMonthYear,
+  MONTHS_SHORT,
+} from '../dateUtils';
 
 describe('daysBetween', () => {
   it('returns 0 for same day', () => {
     const today = new Date();
-    expect(daysBetween(today.toISOString().split('T')[0], today)).toBe(0);
+    expect(daysBetween(toISODateString(today), today)).toBe(0);
   });
 
   it('returns positive for a past date', () => {
     const past = new Date();
     past.setDate(past.getDate() - 5);
-    expect(daysBetween(past.toISOString().split('T')[0])).toBe(5);
+    expect(daysBetween(toISODateString(past))).toBe(5);
   });
 
   it('returns negative for a future date', () => {
     const future = new Date();
     future.setDate(future.getDate() + 3);
-    expect(daysBetween(future.toISOString().split('T')[0])).toBe(-3);
+    expect(daysBetween(toISODateString(future))).toBe(-3);
+  });
+
+  it('ignores time of day — compares calendar days', () => {
+    const lateEvening = new Date(2026, 4, 20, 23, 59);
+    expect(daysBetween('2026-05-20', lateEvening)).toBe(0);
+    expect(daysBetween('2026-05-19', lateEvening)).toBe(1);
   });
 
   it('returns 0 for an invalid date string', () => {
@@ -32,7 +48,7 @@ describe('isOverdue', () => {
   it('returns false for a future date', () => {
     const future = new Date();
     future.setFullYear(future.getFullYear() + 1);
-    expect(isOverdue(future.toISOString().split('T')[0])).toBe(false);
+    expect(isOverdue(toISODateString(future))).toBe(false);
   });
 });
 
@@ -67,11 +83,30 @@ describe('toISODateString', () => {
     expect(toISODateString(d)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it('year-month-day are correct for a UTC midnight date', () => {
-    // Use Date.UTC to avoid timezone shifts (IST +5:30 would flip midnight local → prev day UTC)
-    const d = new Date(Date.UTC(2026, 0, 5));
-    const result = toISODateString(d);
-    expect(result).toBe('2026-01-05');
+  it('uses LOCAL date components — local midnight never shifts to the previous day', () => {
+    // The old toISOString() implementation returned "2026-01-04" for this
+    // input on any UTC+ timezone (e.g. IST). Must hold in every timezone.
+    const d = new Date(2026, 0, 5); // Jan 5 2026, 00:00 local
+    expect(toISODateString(d)).toBe('2026-01-05');
+  });
+
+  it('round-trips through parseISODateLocal', () => {
+    const d = new Date(2026, 8, 30); // Sep 30 2026 local
+    expect(toISODateString(parseISODateLocal(toISODateString(d))!)).toBe('2026-09-30');
+  });
+});
+
+describe('parseISODateLocal', () => {
+  it('parses YYYY-MM-DD as local midnight', () => {
+    const d = parseISODateLocal('2026-05-15')!;
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(4);
+    expect(d.getDate()).toBe(15);
+    expect(d.getHours()).toBe(0);
+  });
+
+  it('returns null for garbage', () => {
+    expect(parseISODateLocal('not-a-date')).toBeNull();
   });
 });
 
@@ -82,12 +117,40 @@ describe('parseExcelDate', () => {
     expect(parseExcelDate('')).toBe('');
   });
 
-  it('parses an ISO string', () => {
+  it('parses an ISO string without shifting the day', () => {
     expect(parseExcelDate('2024-05-15')).toBe('2024-05-15');
   });
 
   it('parses Excel serial number 45000 to a date string', () => {
     const result = parseExcelDate(45000);
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('parseMonthYear / compareMonthYear', () => {
+  it('round-trips every month of the year', () => {
+    for (let m = 0; m < 12; m++) {
+      const parsed = parseMonthYear(`${MONTHS_SHORT[m]}-2026`);
+      expect(parsed).toEqual({ year: 2026, monthIndex: m });
+    }
+  });
+
+  it('returns null for unparseable input', () => {
+    expect(parseMonthYear('Sept-2026')).toBeNull(); // locale spelling, not ours
+    expect(parseMonthYear('2026')).toBeNull();
+    expect(parseMonthYear('')).toBeNull();
+  });
+
+  it('sorts chronologically, not alphabetically', () => {
+    // Alphabetically "Apr-2026" < "Dec-2025" — chronologically it is later
+    expect(compareMonthYear('Apr-2026', 'Dec-2025')).toBeGreaterThan(0);
+    expect(compareMonthYear('Dec-2025', 'Apr-2026')).toBeLessThan(0);
+    expect(compareMonthYear('May-2026', 'May-2026')).toBe(0);
+  });
+
+  it('orders a shuffled year correctly', () => {
+    const shuffled = ['Nov-2026', 'Feb-2026', 'Sep-2026', 'Jan-2026', 'May-2026'];
+    const sorted = [...shuffled].sort(compareMonthYear);
+    expect(sorted).toEqual(['Jan-2026', 'Feb-2026', 'May-2026', 'Sep-2026', 'Nov-2026']);
   });
 });

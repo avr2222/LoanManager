@@ -29,13 +29,19 @@ function fromDbInvitation(row: Record<string, unknown>): Invitation {
 export const invitationsService = {
   // Create a new invitation. phone is optional — if set, only that phone can use it.
   async create(phone: string, note: string): Promise<{ data: Invitation | null; error: string | null }> {
-    const { data, error } = await supabase
-      .from('invitations')
-      .insert({ phone: phone.replace(/\D/g, '').slice(-10), note, created_by: (await supabase.auth.getUser()).data.user?.id })
-      .select()
-      .single();
-    if (error) return { data: null, error: error.message };
-    return { data: fromDbInvitation(data as Record<string, unknown>), error: null };
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { data: null, error: 'Not authenticated' };
+      const { data, error } = await supabase
+        .from('invitations')
+        .insert({ phone: phone.replace(/\D/g, '').slice(-10), note, created_by: user.id })
+        .select()
+        .single();
+      if (error) return { data: null, error: error.message };
+      return { data: fromDbInvitation(data as Record<string, unknown>), error: null };
+    } catch (e) {
+      return { data: null, error: e instanceof Error ? e.message : String(e) };
+    }
   },
 
   // List all invitations created by the current user (or all if super admin)

@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable, { type CellHookData } from 'jspdf-autotable';
 import type { Loan, Payment } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/formatUtils';
-import { toISODateString } from '@/utils/dateUtils';
+import { toISODateString, compareMonthYear } from '@/utils/dateUtils';
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 const INDIGO  = [99,  102, 241] as [number, number, number];
@@ -259,7 +259,7 @@ export function exportUserPDF(
     addPageHeader(doc, `Payment History  —  ${userName}`, today);
 
     const sorted = [...myPayments].sort((a, b) =>
-      a.loanId.localeCompare(b.loanId) || a.monthYear.localeCompare(b.monthYear)
+      a.loanId.localeCompare(b.loanId) || compareMonthYear(a.monthYear, b.monthYear)
     );
 
     autoTable(doc, {
@@ -382,7 +382,7 @@ export function exportAdminPDF(adminName: string, loans: Loan[], payments: Payme
     doc.addPage();
     addPageHeader(doc, `Payment History  —  ${adminName}`, today);
     const sorted = [...payments].sort((a, b) =>
-      a.loanId.localeCompare(b.loanId) || a.monthYear.localeCompare(b.monthYear)
+      a.loanId.localeCompare(b.loanId) || compareMonthYear(a.monthYear, b.monthYear)
     );
     autoTable(doc, {
       ...tableBase,

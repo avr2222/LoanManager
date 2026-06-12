@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveLoanFields, derivePaymentFields, generateMonthlyPayment, computeKPIs } from '../calculationService';
+import { deriveLoanFields, derivePaymentFields, generateMonthlyPayment, computeKPIs, isOverduePayment } from '../calculationService';
 import { getDueDateForMonth, toISODateString } from '@/utils/dateUtils';
 import type { Loan, Payment } from '@/types';
 
@@ -244,5 +244,28 @@ describe('computeKPIs', () => {
     ];
     const result = computeKPIs([], payments);
     expect(result.totalPendingAmount).toBe(1000);
+  });
+
+  it('counts overdue Partial payments — money is still outstanding', () => {
+    const payments = [
+      makePayment({ id: 'p1', paymentStatus: 'Partial', daysOverdue: 10, amountReceived: 500, pendingAmount: 1500 }),
+      makePayment({ id: 'p2', paymentStatus: 'Pending', daysOverdue: 3, pendingAmount: 2000 }),
+      makePayment({ id: 'p3', paymentStatus: 'Received', daysOverdue: 0, pendingAmount: 0 }),
+      makePayment({ id: 'p4', paymentStatus: 'Waived', daysOverdue: 0, pendingAmount: 0 }),
+    ];
+    const result = computeKPIs([], payments);
+    expect(result.totalOverduePayments).toBe(2);
+    expect(result.totalPendingAmount).toBe(3500);
+  });
+});
+
+describe('isOverduePayment', () => {
+  it('matches Pending, Partial and Claimed past due; never Received or Waived', () => {
+    expect(isOverduePayment({ paymentStatus: 'Pending', daysOverdue: 1 })).toBe(true);
+    expect(isOverduePayment({ paymentStatus: 'Partial', daysOverdue: 1 })).toBe(true);
+    expect(isOverduePayment({ paymentStatus: 'Claimed', daysOverdue: 1 })).toBe(true);
+    expect(isOverduePayment({ paymentStatus: 'Received', daysOverdue: 1 })).toBe(false);
+    expect(isOverduePayment({ paymentStatus: 'Waived', daysOverdue: 1 })).toBe(false);
+    expect(isOverduePayment({ paymentStatus: 'Pending', daysOverdue: 0 })).toBe(false);
   });
 });

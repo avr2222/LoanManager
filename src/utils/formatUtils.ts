@@ -1,3 +1,5 @@
+import { MONTHS_SHORT, parseISODateLocal } from './dateUtils';
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -22,8 +24,8 @@ export function formatRateAsRupees(annualPct: number): string {
 
 export function formatDate(isoDate: string): string {
   if (!isoDate) return '-';
-  const d = new Date(isoDate);
-  if (isNaN(d.getTime())) return '-';
+  const d = parseISODateLocal(isoDate);
+  if (!d) return '-';
   return d.toLocaleDateString('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -37,6 +39,9 @@ export function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
 }
 
+/** Formats as "May-2026". Locale-independent: toLocaleDateString renders
+ *  September as "Sept" in modern ICU (and may emit non-breaking spaces),
+ *  which breaks parseMonthYear() round-trips. */
 export function formatMonthYear(date: Date): string {
-  return date.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }).replace(' ', '-');
+  return `${MONTHS_SHORT[date.getMonth()]}-${date.getFullYear()}`;
 }

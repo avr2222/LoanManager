@@ -1,12 +1,14 @@
 import * as XLSX from 'xlsx';
 import type { Loan, Payment, LoanType, LoanStatus, PaymentStatus } from '@/types';
-import { deriveLoanFields, derivePaymentFields } from './calculationService';
-import { parseExcelDate, toISODateString } from '@/utils/dateUtils';
+import { deriveLoanFields, derivePaymentFields, isOverduePayment } from './calculationService';
+import { parseExcelDate, toISODateString, compareMonthYear } from '@/utils/dateUtils';
 import { formatDate } from '@/utils/formatUtils';
 
 interface ImportResult {
   loans: Loan[];
   payments: Payment[];
+  /** Human-readable notes about rows that needed coercion, generated IDs, or were dropped */
+  warnings: string[];
 }
 
 // ── Fuzzy column lookup ───────────────────────────────────────────────────────
@@ -34,6 +36,18 @@ function col(row: Record<string, unknown>, ...candidates: string[]): unknown {
 function str(v: unknown): string { return String(v ?? '').trim(); }
 function num(v: unknown): number { return parseFloat(String(v ?? '0').replace(/[^0-9.-]/g, '')) || 0; }
 function int(v: unknown): number { return parseInt(String(v ?? '0')) || 0; }
+
+// Like num(), but records a warning instead of silently importing garbage as 0
+function numWarn(v: unknown, field: string, rowNo: number, warnings: string[]): number {
+  const s = str(v);
+  if (!s) return 0;
+  const n = parseFloat(s.replace(/[^0-9.-]/g, ''));
+  if (isNaN(n)) {
+    warnings.push(`Loan row ${rowNo}: "${field}" value "${s}" is not a number — imported as 0`);
+    return 0;
+  }
+  return n;
+}
 
 // ── Header row detection ──────────────────────────────────────────────────────
 
@@ -79,27 +93,42 @@ export async function importFromExcel(file: File): Promise<ImportResult> {
   const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
   console.log('[Excel] Sheet names:', wb.SheetNames);
 
-  const loans = parseLoans(wb);
-  const payments = parsePayments(wb, loans);
+  const warnings: string[] = [];
+  const loans = parseLoans(wb, warnings);
+  const payments = parsePayments(wb, loans, warnings);
 
-  console.log('[Excel] Parsed totals →', loans.length, 'loans,', payments.length, 'payments');
-  return { loans, payments };
+  console.log('[Excel] Parsed totals →', loans.length, 'loans,', payments.length, 'payments,', warnings.length, 'warnings');
+  return { loans, payments, warnings };
 }
 
 // ── Loan Master ───────────────────────────────────────────────────────────────
 
-function parseLoans(wb: XLSX.WorkBook): Loan[] {
+function parseLoans(wb: XLSX.WorkBook, warnings: string[]): Loan[] {
   const rows = getSheetRows(wb, 'Loan Master');
   const now = new Date().toISOString();
   const loans: Loan[] = [];
+  const seenIds = new Set<string>();
 
-  for (const row of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNo = i + 1;
     // Use fuzzy lookup for borrower name — skip empty / formula-result rows
     const borrowerName = str(col(row, 'Borrower Full Name', 'Borrower Name', 'BorrowerName', 'Name'));
     if (!borrowerName || borrowerName === '0') continue;
 
     const loanIdRaw = str(col(row, 'Loan ID', 'LoanID', 'Loan Id'));
-    const loanId = loanIdRaw || `L${String(loans.length + 1).padStart(3, '0')}`;
+    if (loanIdRaw && seenIds.has(loanIdRaw)) {
+      warnings.push(`Loan row ${rowNo}: duplicate Loan ID "${loanIdRaw}" — row skipped (first occurrence kept)`);
+      continue;
+    }
+    let loanId = loanIdRaw;
+    if (!loanId) {
+      // Generate a fallback ID that doesn't collide with explicit or earlier generated IDs
+      let n = loans.length + 1;
+      do { loanId = `L${String(n++).padStart(3, '0')}`; } while (seenIds.has(loanId));
+      warnings.push(`Loan row ${rowNo}: missing Loan ID — generated "${loanId}"`);
+    }
+    seenIds.add(loanId);
 
     const loanTypeRaw = str(col(row, 'Loan Type (Direct/Mediator)', 'Loan Type', 'LoanType'));
     const loanType: LoanType = loanTypeRaw.toLowerCase().includes('mediator') ? 'Through Mediator' : 'Direct';
@@ -118,9 +147,9 @@ function parseLoans(wb: XLSX.WorkBook): Loan[] {
       loanType,
       mediatorName: loanType === 'Through Mediator' ? str(col(row, 'Mediator Name', 'MediatorName')) : '',
       mediatorPhone: loanType === 'Through Mediator' ? str(col(row, 'Mediator Phone No.', 'Mediator Phone')) : '',
-      mediatorCommissionPct: num(col(row, 'Mediator Commission (% of Interest)', 'Mediator Commission %', 'Commission %', 'Commission')),
-      principalAmount: num(col(row, 'Principal Amount (₹)', 'Principal Amount', 'Principal')),
-      annualInterestRate: num(col(row, 'Annual Interest Rate (%)', 'Annual Interest Rate', 'Interest Rate', 'Annual Rate')),
+      mediatorCommissionPct: numWarn(col(row, 'Mediator Commission (% of Interest)', 'Mediator Commission %', 'Commission %', 'Commission'), 'Mediator Commission', rowNo, warnings),
+      principalAmount: numWarn(col(row, 'Principal Amount (₹)', 'Principal Amount', 'Principal'), 'Principal Amount', rowNo, warnings),
+      annualInterestRate: numWarn(col(row, 'Annual Interest Rate (%)', 'Annual Interest Rate', 'Interest Rate', 'Annual Rate'), 'Annual Interest Rate', rowNo, warnings),
       dateGiven: parseExcelDate(col(row, 'Date Given', 'DateGiven', 'Date')),
       expectedTenureMonths: int(col(row, 'Expected Tenure (Months)', 'Expected Tenure', 'Tenure (Months)', 'Tenure')),
       loanStatus,
@@ -136,7 +165,7 @@ function parseLoans(wb: XLSX.WorkBook): Loan[] {
 
 // ── Monthly Interest Tracker ──────────────────────────────────────────────────
 
-function parsePayments(wb: XLSX.WorkBook, loans: Loan[]): Payment[] {
+function parsePayments(wb: XLSX.WorkBook, loans: Loan[], warnings: string[]): Payment[] {
   const rows = getSheetRows(wb, 'Monthly Interest Tracker');
   const now = new Date().toISOString();
   const payments: Payment[] = [];
@@ -178,12 +207,15 @@ function parsePayments(wb: XLSX.WorkBook, loans: Loan[]): Payment[] {
 
   // Deduplicate: keep only the first occurrence of each loanId + monthYear combo
   const seen = new Set<string>();
-  return payments.filter((p) => {
+  const deduped = payments.filter((p) => {
     const key = `${p.loanId}::${p.monthYear}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+  const dropped = payments.length - deduped.length;
+  if (dropped > 0) warnings.push(`Payments: ${dropped} duplicate row(s) (same Loan ID + Month-Year) skipped`);
+  return deduped;
 }
 
 // ── User Report (Loans Given / Taken / Mediated) ─────────────────────────────
@@ -271,7 +303,7 @@ export function exportUserReport(
       'Status', 'Days Overdue', 'Pending (Rs)', 'Remarks',
     ];
     const payRows = payments
-      .sort((a, b) => a.loanId.localeCompare(b.loanId) || a.monthYear.localeCompare(b.monthYear))
+      .sort((a, b) => a.loanId.localeCompare(b.loanId) || compareMonthYear(a.monthYear, b.monthYear))
       .map((p) => [
         p.loanId, p.borrowerName, p.monthYear, formatDate(p.dueDate),
         p.netAmountExpected, p.amountReceived,
@@ -363,7 +395,7 @@ export function exportToExcel(loans: Loan[], payments: Payment[]): void {
   XLSX.utils.book_append_sheet(wb, paySheet, 'Monthly Interest Tracker');
 
   const activeLoans = loans.filter((l) => l.loanStatus === 'Active');
-  const overduePayments = payments.filter((p) => p.daysOverdue > 0 && p.paymentStatus === 'Pending');
+  const overduePayments = payments.filter(isOverduePayment);
   const dashData = [
     ['LOAN PORTFOLIO DASHBOARD'],
     ['Generated on', new Date().toLocaleDateString('en-IN')],

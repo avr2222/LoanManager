@@ -13,6 +13,7 @@ import {
 } from '@/services/confirmationsService';
 import { profilesService } from '@/services/profilesService';
 import { formatCurrency, ordinal } from '@/utils/formatUtils';
+import { compareMonthYear } from '@/utils/dateUtils';
 import { useApp } from '@/context/AppContext';
 import { resolveProfileName } from '@/utils/profileUtils';
 import { ChevronLeft, CheckCircle, XCircle, Clock, Edit2, MessageSquare, Smartphone, ArrowRight } from 'lucide-react';
@@ -108,7 +109,7 @@ export function LoanDetailPage() {
   const myPhone = phone.replace(/\D/g, '').slice(-10);
 
   const loan = loans.find((l) => l.loanId === id);
-  const loanPayments = payments.filter((p) => p.loanId === id).sort((a, b) => b.monthYear.localeCompare(a.monthYear));
+  const loanPayments = payments.filter((p) => p.loanId === id).sort((a, b) => compareMonthYear(b.monthYear, a.monthYear));
 
   const [confirmations, setConfirmations] = useState<PartyConfirmation[]>([]);
   const [loadingConf, setLoadingConf] = useState(true);

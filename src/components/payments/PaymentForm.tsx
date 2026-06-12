@@ -4,7 +4,7 @@ import type { Payment, PaymentStatus } from '@/types';
 import { useLoans } from '@/context/LoanContext';
 import { useAuth } from '@/context/AuthContext';
 import { formatCurrency, formatMonthYear, formatDate } from '@/utils/formatUtils';
-import { getDueDateForMonth, toISODateString } from '@/utils/dateUtils';
+import { getDueDateForMonth, toISODateString, parseMonthYear, daysBetween } from '@/utils/dateUtils';
 
 interface PaymentFormProps {
   initialValues?: Payment;
@@ -44,16 +44,23 @@ export function PaymentForm({ initialValues, defaultLoanId, onSubmit, onCancel }
 
   const selectedLoan = loans.find((l) => l.loanId === loanId);
 
-  // Auto-fill status based on amount typed
+  // True once the user has typed in the amount field — the auto-status effect
+  // must not fire on mount, or editing an existing payment would silently
+  // rewrite its saved status (e.g. flip an old Partial to Received).
+  const [amountEdited, setAmountEdited] = useState(false);
+
+  // Auto-fill status based on amount typed.
+  // paymentStatus is intentionally omitted from deps: a manual status choice
+  // should stand until the user edits the amount again.
   useEffect(() => {
-    if (!selectedLoan) return;
+    if (!amountEdited || !selectedLoan) return;
     if (paymentStatus === 'Waived') return;
     const expected = selectedLoan.netMonthlyReceipt;
     if (amountReceived >= expected) setPaymentStatus('Received');
     else if (amountReceived > 0 && amountReceived < expected) setPaymentStatus('Partial');
     else setPaymentStatus('Pending');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amountReceived, selectedLoan]);
+  }, [amountEdited, amountReceived, selectedLoan]);
 
   // Auto-fill amount when status is manually set to Received
   function handleStatusChange(status: PaymentStatus) {
@@ -79,20 +86,15 @@ export function PaymentForm({ initialValues, defaultLoanId, onSubmit, onCancel }
     if (!validate() || !selectedLoan || saving) return;
     setSaving(true);
 
-    const [mon, yr] = monthYear.split('-');
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const monthIdx = months.indexOf(mon);
-    const year = parseInt(yr);
-    const dueDate = monthIdx >= 0
-      ? toISODateString(getDueDateForMonth(selectedLoan.monthlyDueDay, year, monthIdx))
+    const parsed = parseMonthYear(monthYear);
+    const dueDate = parsed
+      ? toISODateString(getDueDateForMonth(selectedLoan.monthlyDueDay, parsed.year, parsed.monthIndex))
       : (initialValues?.dueDate ?? toISODateString(now));
 
-    const today = new Date();
-    const dueDateObj = new Date(dueDate);
     const daysOverdue =
       paymentStatus === 'Received' || paymentStatus === 'Waived'
         ? 0
-        : Math.max(0, Math.floor((today.getTime() - dueDateObj.getTime()) / 86400000));
+        : Math.max(0, daysBetween(dueDate));
 
     const pendingAmount =
       paymentStatus === 'Received' || paymentStatus === 'Waived'
@@ -205,7 +207,7 @@ export function PaymentForm({ initialValues, defaultLoanId, onSubmit, onCancel }
             min="0"
             className={inputClass('amountReceived')}
             value={amountReceived || ''}
-            onChange={(e) => setAmountReceived(parseFloat(e.target.value) || 0)}
+            onChange={(e) => { setAmountEdited(true); setAmountReceived(parseFloat(e.target.value) || 0); }}
           />
         </div>
 

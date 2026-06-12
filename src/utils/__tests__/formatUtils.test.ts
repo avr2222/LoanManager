@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { formatCurrency, formatPercent, formatRateAsRupees, formatDate, ordinal, formatMonthYear } from '../formatUtils';
+import { parseMonthYear } from '../dateUtils';
 
 describe('formatCurrency', () => {
   it('formats 0 as ₹0', () => {
@@ -80,5 +81,19 @@ describe('formatMonthYear', () => {
   it('formats January 2025 as "Jan-2025"', () => {
     const d = new Date(2025, 0, 15);
     expect(formatMonthYear(d)).toBe('Jan-2025');
+  });
+
+  it('formats September as "Sep", not the locale\'s "Sept"', () => {
+    // toLocaleDateString-based formatting produced "Sept-2026" in modern ICU,
+    // which broke parseMonthYear() and silently mis-dated September payments
+    const d = new Date(2026, 8, 1);
+    expect(formatMonthYear(d)).toBe('Sep-2026');
+  });
+
+  it('round-trips through parseMonthYear for all 12 months', () => {
+    for (let m = 0; m < 12; m++) {
+      const label = formatMonthYear(new Date(2026, m, 10));
+      expect(parseMonthYear(label)).toEqual({ year: 2026, monthIndex: m });
+    }
   });
 });

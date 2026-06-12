@@ -38,10 +38,13 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
 
 export async function saveSubscription(userId: string, sub: PushSubscription): Promise<void> {
   const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
-  await supabase.from('push_subscriptions').upsert(
+  // Must throw on failure — initPushNotifications only marks registration
+  // complete (localStorage flag) when the subscription actually persisted.
+  const { error } = await supabase.from('push_subscriptions').upsert(
     { user_id: userId, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth },
     { onConflict: 'user_id,endpoint' }
   );
+  if (error) throw new Error(`Failed to save push subscription: ${error.message}`);
 }
 
 export async function unsubscribeFromPush(userId: string): Promise<void> {
@@ -51,7 +54,9 @@ export async function unsubscribeFromPush(userId: string): Promise<void> {
   if (!sub) return;
   const { endpoint } = sub;
   await sub.unsubscribe();
-  await supabase.from('push_subscriptions').delete().eq('user_id', userId).eq('endpoint', endpoint);
+  const { error } = await supabase.from('push_subscriptions').delete().eq('user_id', userId).eq('endpoint', endpoint);
+  if (error) throw new Error(`Failed to delete push subscription: ${error.message}`);
+  localStorage.removeItem(storageKey(userId));
 }
 
 const storageKey = (userId: string) => `push_reg_${userId}`;

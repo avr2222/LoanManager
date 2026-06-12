@@ -8,6 +8,8 @@ import { formatCurrency, formatDate } from '@/utils/formatUtils';
 import { useApp } from '@/context/AppContext';
 import { useLoans } from '@/context/LoanContext';
 import { resolveProfileName } from '@/utils/profileUtils';
+import { compareMonthYear } from '@/utils/dateUtils';
+import { isOverduePayment } from '@/services/calculationService';
 
 type FilterValue = PaymentStatus | 'All' | 'Overdue';
 
@@ -61,15 +63,19 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
         p.monthYear.toLowerCase().includes(search.toLowerCase());
       const matchStatus =
         statusFilter === 'All' ? true :
-        statusFilter === 'Overdue' ? (p.daysOverdue > 0 && p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived') :
+        statusFilter === 'Overdue' ? isOverduePayment(p) :
         p.paymentStatus === statusFilter;
       return matchSearch && matchStatus;
     })
     .sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
-      if (typeof av === 'number' && typeof bv === 'number') return sortAsc ? av - bv : bv - av;
-      return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+      let cmp: number;
+      if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv;
+      // "May-2026" strings sort alphabetically, not chronologically — parse them
+      else if (sortKey === 'monthYear') cmp = compareMonthYear(String(av), String(bv));
+      else cmp = String(av).localeCompare(String(bv));
+      return sortAsc ? cmp : -cmp;
     });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
