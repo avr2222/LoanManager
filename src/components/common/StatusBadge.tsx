@@ -15,10 +15,24 @@ const statusStyles: Record<string, string> = {
   Claimed:      'bg-violet-50 text-violet-700 ring-violet-200',
 };
 
+const dotStyles: Record<string, string> = {
+  Active:       'bg-emerald-500',
+  Closed:       'bg-slate-400',
+  Defaulted:    'bg-red-500',
+  Restructured: 'bg-amber-500',
+  Received:     'bg-emerald-500',
+  Pending:      'bg-orange-500',
+  Waived:       'bg-slate-400',
+  Partial:      'bg-blue-500',
+  Claimed:      'bg-violet-500',
+};
+
 export function StatusBadge({ status, label }: StatusBadgeProps) {
   const style = statusStyles[status] ?? 'bg-slate-100 text-slate-500 ring-slate-200';
+  const dot = dotStyles[status] ?? 'bg-slate-400';
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ring-1 ring-inset ${style}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ring-1 ring-inset ${style}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} aria-hidden="true" />
       {label ?? status}
     </span>
   );

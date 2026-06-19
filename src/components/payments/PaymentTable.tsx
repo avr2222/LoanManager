@@ -12,7 +12,7 @@ import { resolveProfileName } from '@/utils/profileUtils';
 import { compareMonthYear } from '@/utils/dateUtils';
 import { isOverduePayment } from '@/services/calculationService';
 
-type FilterValue = PaymentStatus | 'All' | 'Overdue';
+type FilterValue = PaymentStatus | 'All' | 'Overdue' | 'Outstanding';
 
 interface PaymentTableProps {
   payments: Payment[];
@@ -72,6 +72,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
         p.monthYear.toLowerCase().includes(search.toLowerCase());
       const matchStatus =
         statusFilter === 'All' ? true :
+        statusFilter === 'Outstanding' ? (p.paymentStatus === 'Pending' || p.paymentStatus === 'Partial') :
         statusFilter === 'Overdue' ? isOverduePayment(p) :
         p.paymentStatus === statusFilter;
       return matchSearch && matchStatus;
@@ -189,6 +190,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
           className="px-2 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none"
         >
           <option value="All">All</option>
+          <option value="Outstanding">Outstanding</option>
           <option value="Overdue">Overdue</option>
           <option value="Pending">Pending</option>
           <option value="Received">Received</option>

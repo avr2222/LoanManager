@@ -68,8 +68,8 @@ export function PaymentsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // Seed filter/search from navigation state (e.g. dashboard KPI card clicks)
   // synchronously so PaymentTable mounts with them already applied
-  const navState = location.state as { openForm?: boolean; loanId?: string; filter?: 'All' | 'Received' | 'Pending' | 'Overdue'; search?: string } | null;
-  const [activeFilter, setActiveFilter] = useState<'All' | 'Received' | 'Pending' | 'Overdue'>(navState?.filter ?? 'All');
+  const navState = location.state as { openForm?: boolean; loanId?: string; filter?: 'All' | 'Received' | 'Pending' | 'Overdue' | 'Outstanding'; search?: string } | null;
+  const [activeFilter, setActiveFilter] = useState<'All' | 'Received' | 'Pending' | 'Overdue' | 'Outstanding'>(navState?.filter ?? 'Outstanding');
   const [initialSearch] = useState(navState?.search ?? '');
 
   // Auto-open form when navigated here with a loanId (e.g. from Dashboard "Record" button)
@@ -150,7 +150,9 @@ export function PaymentsPage() {
 
   const totalExpected = visiblePayments.reduce((s, p) => s + p.netAmountExpected, 0);
   const totalReceived = visiblePayments.reduce((s, p) => s + p.amountReceived, 0);
-  const totalPending = visiblePayments.filter((p) => p.paymentStatus === 'Pending' || p.paymentStatus === 'Partial').reduce((s, p) => s + p.pendingAmount, 0);
+  const pendingPayments = visiblePayments.filter((p) => p.paymentStatus === 'Pending' || p.paymentStatus === 'Partial');
+  const totalPending = pendingPayments.reduce((s, p) => s + p.pendingAmount, 0);
+  const receivedCount = visiblePayments.filter((p) => p.paymentStatus === 'Received').length;
   const overduePayments = visiblePayments.filter(isOverduePayment);
   const overdueAmount = overduePayments.reduce((s, p) => s + p.pendingAmount, 0);
 
@@ -161,10 +163,10 @@ export function PaymentsPage() {
       {/* Summary — 2 cols on mobile, 4 on md — clickable to filter */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {([
-          { label: 'Total Expected', value: formatCurrency(totalExpected), subtitle: '',                                                          color: 'text-slate-900',   bg: 'from-slate-50 to-white border-slate-200/60', filter: 'All'      as const },
-          { label: 'Total Received', value: formatCurrency(totalReceived), subtitle: '',                                                          color: 'text-emerald-600', bg: 'from-emerald-50 to-white border-emerald-100', filter: 'Received' as const },
-          { label: 'Total Pending',  value: formatCurrency(totalPending),  subtitle: '',                                                          color: 'text-amber-500',   bg: 'from-amber-50 to-white border-amber-100',     filter: 'Pending'  as const },
-          { label: 'Overdue',        value: formatCurrency(overdueAmount), subtitle: t('payments.paymentsCount', { count: overduePayments.length }), color: 'text-red-500',     bg: 'from-red-50 to-white border-red-100',         filter: 'Overdue'  as const },
+          { label: 'Total Expected', value: formatCurrency(totalExpected), subtitle: t('payments.paymentsCount', { count: visiblePayments.length }),  color: 'text-slate-900',   bg: 'from-slate-50 to-white border-slate-200/60', filter: 'All'         as const },
+          { label: 'Total Received', value: formatCurrency(totalReceived), subtitle: t('payments.paymentsCount', { count: receivedCount }),          color: 'text-emerald-600', bg: 'from-emerald-50 to-white border-emerald-100', filter: 'Received'    as const },
+          { label: 'Total Pending',  value: formatCurrency(totalPending),  subtitle: t('payments.paymentsCount', { count: pendingPayments.length }),  color: 'text-amber-500',   bg: 'from-amber-50 to-white border-amber-100',     filter: 'Outstanding' as const },
+          { label: 'Overdue',        value: formatCurrency(overdueAmount), subtitle: t('payments.paymentsCount', { count: overduePayments.length }), color: 'text-red-500',     bg: 'from-red-50 to-white border-red-100',         filter: 'Overdue'     as const },
         ] as const).map(({ label, value, subtitle, color, bg, filter }) => {
           const isActive = activeFilter === filter;
           return (
@@ -175,8 +177,8 @@ export function PaymentsPage() {
             >
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight">{label}</p>
               <p className={`text-xl md:text-2xl font-bold mt-1.5 ${color}`}>{value}</p>
-              {subtitle && !isActive && <p className="text-[10px] text-slate-400 mt-1 font-medium">{subtitle}</p>}
-              {isActive && <p className="text-[10px] text-indigo-400 mt-1 font-medium">Filtered ↑ click to clear</p>}
+              {subtitle && <p className={`text-[10px] mt-1 font-medium ${isActive ? 'text-indigo-500' : 'text-slate-400'}`}>{subtitle}</p>}
+              {isActive && <p className="text-[10px] text-indigo-400 mt-0.5 font-medium">Filtered · tap to clear</p>}
             </button>
           );
         })}
