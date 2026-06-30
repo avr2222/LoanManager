@@ -311,6 +311,18 @@ export const paymentsService = {
     if (error) throw error;
   },
 
+  /** Waive all future Pending payments for a loan (called when loan is closed) */
+  async waiveFuturePendingByLoan(loanId: string, fromDate: string): Promise<void> {
+    const { error } = await supabase
+      .from('payments')
+      .update({ payment_status: 'Waived', updated_at: new Date().toISOString() })
+      .eq('loan_id', loanId)
+      .eq('payment_status', 'Pending')
+      .gte('due_date', fromDate)
+      .is('deleted_at', null);
+    if (error) throw error;
+  },
+
   /** Restore a soft-deleted payment */
   async restore(id: string): Promise<void> {
     const { error } = await supabase

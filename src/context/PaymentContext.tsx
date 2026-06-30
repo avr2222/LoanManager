@@ -10,7 +10,8 @@ type PaymentAction =
   | { type: 'ADD'; payload: Payment }
   | { type: 'UPDATE'; payload: Payment }
   | { type: 'DELETE'; payload: string }
-  | { type: 'DELETE_BY_LOAN'; payload: string };
+  | { type: 'DELETE_BY_LOAN'; payload: string }
+  | { type: 'WAIVE_FUTURE_BY_LOAN'; payload: { loanId: string; fromDate: string } };
 
 function paymentReducer(state: Payment[], action: PaymentAction): Payment[] {
   switch (action.type) {
@@ -26,6 +27,14 @@ function paymentReducer(state: Payment[], action: PaymentAction): Payment[] {
       return state.filter((p) => p.id !== action.payload);
     case 'DELETE_BY_LOAN':
       return state.filter((p) => p.loanId !== action.payload);
+    case 'WAIVE_FUTURE_BY_LOAN':
+      return state.map((p) =>
+        p.loanId === action.payload.loanId &&
+        p.paymentStatus === 'Pending' &&
+        p.dueDate >= action.payload.fromDate
+          ? derivePaymentFields({ ...p, paymentStatus: 'Waived' })
+          : p
+      );
     default:
       return state;
   }
@@ -41,6 +50,7 @@ interface PaymentContextValue {
   deletePayment: (id: string) => Promise<void>;
   restorePayment: (id: string) => Promise<void>;
   deletePaymentsByLoan: (loanId: string) => Promise<void>;
+  waiveFuturePendingByLoan: (loanId: string) => Promise<number>;
   bulkLoadPayments: (payments: Payment[]) => void;
 }
 
@@ -90,12 +100,23 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'DELETE_BY_LOAN', payload: loanId });
   }, []);
 
+  const waiveFuturePendingByLoan = useCallback(async (loanId: string): Promise<number> => {
+    const today = new Date().toISOString().slice(0, 10);
+    // Count before dispatching so we can return the number waived
+    const count = payments.filter(
+      (p) => p.loanId === loanId && p.paymentStatus === 'Pending' && p.dueDate >= today
+    ).length;
+    await paymentsService.waiveFuturePendingByLoan(loanId, today);
+    dispatch({ type: 'WAIVE_FUTURE_BY_LOAN', payload: { loanId, fromDate: today } });
+    return count;
+  }, [payments]);
+
   const bulkLoadPayments = useCallback((payments: Payment[]) => {
     dispatch({ type: 'BULK_LOAD', payload: payments });
   }, []);
 
   return (
-    <PaymentContext.Provider value={{ payments, addPayment, updatePayment, claimPayment, deletePayment, restorePayment, deletePaymentsByLoan, bulkLoadPayments }}>
+    <PaymentContext.Provider value={{ payments, addPayment, updatePayment, claimPayment, deletePayment, restorePayment, deletePaymentsByLoan, waiveFuturePendingByLoan, bulkLoadPayments }}>
       {children}
     </PaymentContext.Provider>
   );

@@ -20,7 +20,7 @@ export function LoansPage() {
   const { loading } = useApp();
   const { loans, addLoan, updateLoan, deleteLoan, setLoanStatus } = useLoans();
   const { isAdmin, hasFullAccess, userPhone, displayName, phone, adminPhone, user } = useAuth();
-  const { deletePaymentsByLoan } = usePayments();
+  const { payments, deletePaymentsByLoan, waiveFuturePendingByLoan } = usePayments();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
@@ -30,6 +30,7 @@ export function LoansPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | undefined>();
   const [deletingLoanId, setDeletingLoanId] = useState<string | null>(null);
+  const [closingLoan, setClosingLoan] = useState<{ loanId: string; status: LoanStatus; waiveCount: number } | null>(null);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>(
     isAdmin && searchParams.get('all') === '1' ? 'All' : 'MyLoans'
   );
@@ -80,12 +81,34 @@ export function LoansPage() {
     }
   }
 
-  async function handleSetStatus(loanId: string, status: LoanStatus) {
+  function handleSetStatus(loanId: string, status: LoanStatus) {
+    if (status === 'Closed') {
+      const today = new Date().toISOString().slice(0, 10);
+      const waiveCount = payments.filter(
+        (p) => p.loanId === loanId && p.paymentStatus === 'Pending' && p.dueDate >= today
+      ).length;
+      setClosingLoan({ loanId, status, waiveCount });
+      return;
+    }
+    void handleSetStatusConfirmed(loanId, status);
+  }
+
+  async function handleSetStatusConfirmed(loanId: string, status: LoanStatus) {
     try {
       await setLoanStatus(loanId, status);
-      showSuccess(t('loans.statusSuccess', { status }));
+      if (status === 'Closed') {
+        const waived = await waiveFuturePendingByLoan(loanId);
+        showSuccess(waived > 0
+          ? t('loans.closedWithWaived', { count: waived, defaultValue: `Loan closed. ${waived} upcoming payment${waived === 1 ? '' : 's'} waived.` })
+          : t('loans.statusSuccess', { status })
+        );
+      } else {
+        showSuccess(t('loans.statusSuccess', { status }));
+      }
     } catch {
       showError(t('loans.statusFailed'));
+    } finally {
+      setClosingLoan(null);
     }
   }
 
@@ -239,6 +262,22 @@ export function LoansPage() {
           danger
           onConfirm={handleDelete}
           onCancel={() => setDeletingLoanId(null)}
+        />
+      )}
+
+      {/* Close Loan Confirm */}
+      {closingLoan && (
+        <ConfirmDialog
+          title="Close Loan"
+          message={
+            closingLoan.waiveCount > 0
+              ? `Closing loan ${closingLoan.loanId} will waive ${closingLoan.waiveCount} upcoming pending payment${closingLoan.waiveCount === 1 ? '' : 's'}. Continue?`
+              : `Mark loan ${closingLoan.loanId} as Closed?`
+          }
+          confirmLabel="Close Loan"
+          danger={false}
+          onConfirm={() => handleSetStatusConfirmed(closingLoan.loanId, closingLoan.status)}
+          onCancel={() => setClosingLoan(null)}
         />
       )}
     </div>
