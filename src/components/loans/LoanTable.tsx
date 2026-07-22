@@ -5,8 +5,18 @@ import type { Loan, LoanStatus } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { EmptyState } from '@/components/common/EmptyState';
 import { formatCurrency, formatDate } from '@/utils/formatUtils';
+import { principalDueStatus } from '@/utils/dateUtils';
 import { useApp } from '@/context/AppContext';
 import { resolveProfileName } from '@/utils/profileUtils';
+
+/** Text-color class for a loan's principal-due date (red overdue / amber soon). */
+function principalDueClass(dueDate?: string | null): string {
+  switch (principalDueStatus(dueDate)) {
+    case 'overdue': return 'text-red-600 font-semibold';
+    case 'soon':    return 'text-amber-600 font-semibold';
+    default:        return 'text-slate-600';
+  }
+}
 
 type RoleFilter = 'MyLoans' | 'All' | 'Lender' | 'Borrower' | 'Mediator';
 
@@ -40,7 +50,7 @@ function getCounterparty(loan: Loan, roleFilter: RoleFilter | undefined, userPho
   return { name: resolveProfileName(loan.borrowerName, loan.borrowerPhone, profileMap), phone: loan.borrowerPhone };
 }
 
-type SortKey = 'loanId' | 'borrowerName' | 'principalAmount' | 'monthlyInterestAmount' | 'loanStatus' | 'dateGiven';
+type SortKey = 'loanId' | 'borrowerName' | 'principalAmount' | 'monthlyInterestAmount' | 'loanStatus' | 'dateGiven' | 'principalDueDate';
 
 export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowClick, readOnly, ownedLoanIds, userPhone, roleFilter }: LoanTableProps) {
   const { t } = useTranslation();
@@ -220,6 +230,11 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
                   <span>{loanTypeLabel(loan)}</span>
                   <StatusBadge status={loan.loanStatus} />
                 </div>
+                {loan.principalDueDate && (
+                  <div className={`mt-1 text-xs ${principalDueClass(loan.principalDueDate)}`}>
+                    {t('loans.principalDue')}: {formatDate(loan.principalDueDate)}
+                  </div>
+                )}
               </div>
             ))}
             {/* Infinite scroll sentinel */}
@@ -246,6 +261,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
                     <th className={thClass} onClick={() => toggleSort('monthlyInterestAmount')}><span className="flex items-center gap-1">{t('loans.monthly')} <SortIcon col="monthlyInterestAmount" /></span></th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">{t('loans.netMonthly')}</th>
                     <th className={thClass} onClick={() => toggleSort('dateGiven')}><span className="flex items-center gap-1">{t('loans.dateGiven')} <SortIcon col="dateGiven" /></span></th>
+                    <th className={thClass} onClick={() => toggleSort('principalDueDate')}><span className="flex items-center gap-1">{t('loans.principalDue')} <SortIcon col="principalDueDate" /></span></th>
                     <th className={thClass} onClick={() => toggleSort('loanStatus')}><span className="flex items-center gap-1">{t('loans.status')} <SortIcon col="loanStatus" /></span></th>
                     {!readOnly && <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">{t('loans.actions')}</th>}
                   </tr>
@@ -271,6 +287,7 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
                       <td className="px-4 py-3 text-sm text-slate-600">{formatCurrency(loan.monthlyInterestAmount)}</td>
                       <td className="px-4 py-3 text-sm font-semibold text-emerald-600">{formatCurrency(loan.netMonthlyReceipt)}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{formatDate(loan.dateGiven)}</td>
+                      <td className={`px-4 py-3 text-sm ${principalDueClass(loan.principalDueDate)}`}>{formatDate(loan.principalDueDate ?? '')}</td>
                       <td className="px-4 py-3"><StatusBadge status={loan.loanStatus} /></td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         {canAct(loan) && (

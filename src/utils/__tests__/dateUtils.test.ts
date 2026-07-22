@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   daysBetween,
   isOverdue,
+  principalDueStatus,
   getDueDateForMonth,
   toISODateString,
   parseExcelDate,
@@ -49,6 +50,41 @@ describe('isOverdue', () => {
     const future = new Date();
     future.setFullYear(future.getFullYear() + 1);
     expect(isOverdue(toISODateString(future))).toBe(false);
+  });
+});
+
+describe('principalDueStatus', () => {
+  const iso = (offsetDays: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    return toISODateString(d);
+  };
+
+  it("returns 'none' for empty / null / undefined", () => {
+    expect(principalDueStatus('')).toBe('none');
+    expect(principalDueStatus(null)).toBe('none');
+    expect(principalDueStatus(undefined)).toBe('none');
+  });
+
+  it("returns 'overdue' for a past date", () => {
+    expect(principalDueStatus(iso(-1))).toBe('overdue');
+    expect(principalDueStatus('2020-01-01')).toBe('overdue');
+  });
+
+  it("returns 'soon' for today and within the 30-day window", () => {
+    expect(principalDueStatus(iso(0))).toBe('soon');
+    expect(principalDueStatus(iso(15))).toBe('soon');
+    expect(principalDueStatus(iso(30))).toBe('soon');
+  });
+
+  it("returns 'later' beyond the window", () => {
+    expect(principalDueStatus(iso(31))).toBe('later');
+    expect(principalDueStatus(iso(200))).toBe('later');
+  });
+
+  it('respects a custom soon window', () => {
+    expect(principalDueStatus(iso(10), 7)).toBe('later');
+    expect(principalDueStatus(iso(5), 7)).toBe('soon');
   });
 });
 
