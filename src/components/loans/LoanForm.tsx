@@ -44,6 +44,7 @@ const defaultForm = {
   annualInterestRate: 0,
   dateGiven: new Date().toISOString().split('T')[0],
   expectedTenureMonths: 0,
+  principalDueDate: '',
   loanStatus: 'Active' as LoanStatus,
   remarks: '',
 };
@@ -76,6 +77,7 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
     annualInterestRate: initialValues.annualInterestRate,
     dateGiven: initialValues.dateGiven,
     expectedTenureMonths: initialValues.expectedTenureMonths,
+    principalDueDate: initialValues.principalDueDate ?? '',
     loanStatus: initialValues.loanStatus,
     remarks: initialValues.remarks,
   } : {
@@ -176,6 +178,9 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
     }
     if (form.expectedTenureMonths < 0) {
       errs.expectedTenureMonths = 'Cannot be negative';
+    }
+    if (form.principalDueDate && form.dateGiven && form.principalDueDate < form.dateGiven) {
+      errs.principalDueDate = 'Must be on or after Date Given';
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -373,6 +378,19 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
             <label className="block text-xs font-medium text-slate-600 mb-1">Expected Tenure (Months)</label>
             <input type="number" min="0" className={inputClass('expectedTenureMonths')} value={form.expectedTenureMonths || ''} onChange={(e) => set('expectedTenureMonths', parseInt(e.target.value) || 0)} />
             {errors.expectedTenureMonths && <p className="text-red-500 text-xs mt-1">{errors.expectedTenureMonths}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              Principal Repayment Date <span className="font-normal text-slate-400">(optional)</span>
+            </label>
+            <input
+              type="date"
+              min={form.dateGiven || undefined}
+              className={inputClass('principalDueDate')}
+              value={form.principalDueDate}
+              onChange={(e) => set('principalDueDate', e.target.value)}
+            />
+            {errors.principalDueDate && <p className="text-red-500 text-xs mt-1">{errors.principalDueDate}</p>}
           </div>
         </div>
       </fieldset>

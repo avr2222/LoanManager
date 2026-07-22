@@ -12,6 +12,9 @@ import { LoanTable } from '@/components/loans/LoanTable';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import { PageSkeleton } from '@/components/common/Skeleton';
+import { CalendarClock } from 'lucide-react';
+import { principalDueStatus, daysBetween } from '@/utils/dateUtils';
+import { formatCurrency, formatDate } from '@/utils/formatUtils';
 
 type RoleFilter = 'MyLoans' | 'All' | 'Lender' | 'Borrower' | 'Mediator';
 
@@ -149,6 +152,26 @@ export function LoansPage() {
 
   const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
 
+  // Loans whose principal is coming due (within 30 days) or already overdue —
+  // respects the active role/lender filter. Soonest / most-overdue first.
+  const upcomingPrincipal = useMemo(() => {
+    return roleFilteredLoans
+      .filter((l) => {
+        if (l.loanStatus === 'Closed') return false;
+        const s = principalDueStatus(l.principalDueDate);
+        return s === 'overdue' || s === 'soon';
+      })
+      .sort((a, b) => String(a.principalDueDate).localeCompare(String(b.principalDueDate)));
+  }, [roleFilteredLoans]);
+
+  // "overdue by N days" / "due today" / "in N days"
+  function principalDueLabel(dueDate: string): string {
+    const diff = daysBetween(dueDate); // today − due
+    if (diff > 0) return t('loans.overdueByDays', { count: diff });
+    if (diff === 0) return t('loans.dueToday');
+    return t('loans.dueInDays', { count: -diff });
+  }
+
   if (loading) return <PageSkeleton />;
 
   return (
@@ -214,6 +237,47 @@ export function LoansPage() {
           </button>
         ))}
       </div>
+
+      {/* Upcoming principal repayments */}
+      {upcomingPrincipal.length > 0 && (
+        <div className="mb-5 rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarClock size={15} className="text-amber-500" />
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest">
+              {t('loans.upcomingPrincipal')}
+            </p>
+            <span className="text-[11px] font-semibold text-amber-600 tabular-nums">{upcomingPrincipal.length}</span>
+          </div>
+          <div className="space-y-1.5">
+            {upcomingPrincipal.map((l) => {
+              const overdue = principalDueStatus(l.principalDueDate) === 'overdue';
+              return (
+                <button
+                  key={l.loanId}
+                  onClick={() => navigate(`/loans/${l.loanId}`)}
+                  className="w-full flex items-center justify-between gap-3 text-left rounded-xl px-3 py-2 bg-white/70 border border-slate-100 hover:border-amber-300 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">
+                      {l.borrowerName}
+                      <span className="ml-2 text-xs font-mono font-semibold text-indigo-400">{l.loanId}</span>
+                    </p>
+                    <p className="text-xs text-slate-400 truncate">
+                      {formatCurrency(l.principalAmount)}{l.borrowerPhone ? ` · ${l.borrowerPhone}` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold text-slate-700">{formatDate(l.principalDueDate ?? '')}</p>
+                    <p className={`text-xs font-medium ${overdue ? 'text-red-600' : 'text-amber-600'}`}>
+                      {principalDueLabel(l.principalDueDate ?? '')}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <LoanTable
         loans={roleFilteredLoans}

@@ -12,7 +12,7 @@ import {
   type ConfirmationStatus,
 } from '@/services/confirmationsService';
 import { profilesService } from '@/services/profilesService';
-import { formatCurrency, ordinal } from '@/utils/formatUtils';
+import { formatCurrency, formatDate, ordinal } from '@/utils/formatUtils';
 import { compareMonthYear } from '@/utils/dateUtils';
 import { useApp } from '@/context/AppContext';
 import { resolveProfileName } from '@/utils/profileUtils';
@@ -314,6 +314,9 @@ export function LoanDetailPage() {
             { label: 'Monthly Interest',   value: formatCurrency(loan.monthlyInterestAmount), highlight: false },
             { label: 'Net Monthly Receipt', value: formatCurrency(loan.netMonthlyReceipt),   highlight: true  },
             { label: 'Due Day',            value: ordinal(loan.monthlyDueDay),                highlight: false },
+            ...(loan.principalDueDate
+              ? [{ label: 'Principal Due', value: formatDate(loan.principalDueDate), highlight: false }]
+              : []),
           ].map(({ label, value, highlight }) => (
             <div key={label} className={`rounded-xl p-3 border ${highlight ? 'border-indigo-100 bg-indigo-50/60' : 'border-slate-100 bg-slate-50'}`}>
               <p className={`text-[10px] font-medium uppercase tracking-wide ${highlight ? 'text-indigo-400' : 'text-slate-400'}`}>{label}</p>

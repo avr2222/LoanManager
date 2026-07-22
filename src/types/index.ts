@@ -24,6 +24,7 @@ export interface Loan {
   dateGiven: string;                // ISO date string
   monthlyDueDay: number;            // day-of-month from dateGiven
   expectedTenureMonths: number;
+  principalDueDate?: string | null; // optional expected principal repayment date (ISO date)
   monthlyInterestAmount: number;    // principal × monthlyInterestRate / 100
   mediatorMonthlyShare: number;     // monthlyInterestAmount × commissionPct / 100
   netMonthlyReceipt: number;        // monthlyInterestAmount − mediatorMonthlyShare

@@ -23,6 +23,20 @@ export function isOverdue(dueDate: string): boolean {
   return daysBetween(dueDate) > 0;
 }
 
+/** Classifies a principal-repayment date for list highlighting / inclusion.
+ *  'overdue' = past due, 'soon' = due today..30 days out, 'later' = further out,
+ *  'none' = unset. `soonWindow` is the number of days that count as "soon". */
+export function principalDueStatus(
+  dueDate?: string | null,
+  soonWindow = 30
+): 'none' | 'overdue' | 'soon' | 'later' {
+  if (!dueDate) return 'none';
+  const diff = daysBetween(dueDate); // today − dueDate: >0 overdue, <0 days remaining
+  if (diff > 0) return 'overdue';
+  const daysUntil = -diff;
+  return daysUntil <= soonWindow ? 'soon' : 'later';
+}
+
 export function getDueDateForMonth(dayOfMonth: number, year: number, month: number): Date {
   // month is 0-indexed
   const lastDay = new Date(year, month + 1, 0).getDate();
