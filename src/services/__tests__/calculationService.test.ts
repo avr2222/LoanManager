@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { deriveLoanFields, derivePaymentFields, generateMonthlyPayment, computeKPIs, isOverduePayment } from '../calculationService';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { deriveLoanFields, derivePaymentFields, generateMonthlyPayment, buildMissingPayments, computeKPIs, isOverduePayment } from '../calculationService';
 import { getDueDateForMonth, toISODateString } from '@/utils/dateUtils';
 import type { Loan, Payment } from '@/types';
 
@@ -202,6 +202,61 @@ describe('generateMonthlyPayment', () => {
     expect(result.interestAmount).toBe(1500);
     expect(result.netAmountExpected).toBe(1200);
     expect(result.mediatorShare).toBe(300);
+  });
+});
+
+// ─── buildMissingPayments ───────────────────────────────────────────────────
+
+describe('buildMissingPayments', () => {
+  // Pin "today" to 22-Jul-2026 so generation windows are deterministic.
+  afterEach(() => { vi.useRealTimers(); });
+  function pinToday() {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 22)); // 22 Jul 2026 (month 0-indexed)
+  }
+
+  it('a new loan given this month does NOT back-generate past-month dues', () => {
+    pinToday();
+    // Given 15-Jul-2026 → first interest due the following month (Aug-2026).
+    const loan = makeLoan({ loanId: 'L100', dateGiven: '2026-07-15', monthlyDueDay: 15 });
+    const result = buildMissingPayments([loan], []);
+    const months = result.map((p) => p.monthYear);
+    expect(months).toEqual(['Aug-2026']);
+    // No May/Jun/Jul 2026 back-dues
+    expect(months).not.toContain('May-2026');
+    expect(months).not.toContain('Jun-2026');
+    expect(months).not.toContain('Jul-2026');
+  });
+
+  it('an old loan still starts at the AUTO_GEN_FROM floor (May-2026)', () => {
+    pinToday();
+    const loan = makeLoan({ loanId: 'L001', dateGiven: '2024-01-10', monthlyDueDay: 10 });
+    const months = buildMissingPayments([loan], []).map((p) => p.monthYear);
+    // Floor May-2026 → one month ahead of today (Aug-2026), inclusive.
+    expect(months).toEqual(['May-2026', 'Jun-2026', 'Jul-2026', 'Aug-2026']);
+  });
+
+  it('never regenerates a deliberately-deleted month (deletedKeys)', () => {
+    pinToday();
+    const loan = makeLoan({ loanId: 'L001', dateGiven: '2024-01-10', monthlyDueDay: 10 });
+    const deletedKeys = new Set(['L001::Jun-2026']);
+    const months = buildMissingPayments([loan], [], deletedKeys).map((p) => p.monthYear);
+    expect(months).not.toContain('Jun-2026');
+    expect(months).toEqual(['May-2026', 'Jul-2026', 'Aug-2026']);
+  });
+
+  it('is idempotent — feeding its own output back yields nothing new', () => {
+    pinToday();
+    const loan = makeLoan({ loanId: 'L001', dateGiven: '2024-01-10', monthlyDueDay: 10 });
+    const first = buildMissingPayments([loan], []);
+    const second = buildMissingPayments([loan], first);
+    expect(second).toEqual([]);
+  });
+
+  it('skips non-active loans', () => {
+    pinToday();
+    const loan = makeLoan({ loanId: 'L001', dateGiven: '2024-01-10', loanStatus: 'Closed' });
+    expect(buildMissingPayments([loan], [])).toEqual([]);
   });
 });
 

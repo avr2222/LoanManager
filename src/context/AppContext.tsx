@@ -2,43 +2,24 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { loansService, paymentsService } from '@/services/supabaseService';
 import { importFromExcel, exportToExcel } from '@/services/excelService';
 import { profilesService } from '@/services/profilesService';
-import { generateMonthlyPayment } from '@/services/calculationService';
+import { buildMissingPayments } from '@/services/calculationService';
 import { initPushNotifications } from '@/services/pushNotificationService';
 import { useLoans } from './LoanContext';
 import { usePayments } from './PaymentContext';
 import { useAuth } from './AuthContext';
-import type { Loan, Payment } from '@/types';
 
-// Generate payment entries from May 2026 → next month for all active loans.
-// Skips months already in existingPayments. Safe to call on every load (idempotent).
-const AUTO_GEN_FROM = new Date(2026, 4, 1); // May 1, 2026 — month is 0-indexed
-
-function buildMissingPayments(loans: Loan[], existingPayments: Payment[]): Payment[] {
-  const have   = new Set(existingPayments.map((p) => `${p.loanId}::${p.monthYear}`));
-  const now    = new Date();
-  const ahead  = new Date(now);
-  ahead.setMonth(ahead.getMonth() + 1); // generate 1 month ahead; handles Dec→Jan rollover
-  const result: Payment[] = [];
-
-  for (const loan of loans) {
-    if (loan.loanStatus !== 'Active') continue;
-
-    // Start from May 2026, never before that
-    let yr = AUTO_GEN_FROM.getFullYear();
-    let mo = AUTO_GEN_FROM.getMonth(); // 0-indexed
-
-    while (yr < ahead.getFullYear() || (yr === ahead.getFullYear() && mo <= ahead.getMonth())) {
-      const p = generateMonthlyPayment(loan, yr, mo);
-      if (!have.has(`${loan.loanId}::${p.monthYear}`)) {
-        result.push(p);
-        have.add(`${loan.loanId}::${p.monthYear}`);
-      }
-      mo++;
-      if (mo > 11) { mo = 0; yr++; }
-    }
+/** `${loanId}::${monthYear}` keys of soft-deleted payments — passed to
+ *  buildMissingPayments so a deleted month is never regenerated. Fetched fresh
+ *  (source of truth in the DB) so mid-session deletions are always reflected.
+ *  Degrades to an empty set on error, so generation is never blocked. */
+async function fetchDeletedKeys(): Promise<Set<string>> {
+  try {
+    const deleted = await paymentsService.fetchDeleted();
+    return new Set(deleted.map((p) => `${p.loanId}::${p.monthYear}`));
+  } catch (err) {
+    console.warn('[AutoGen] Could not fetch deleted payments for exclusion:', err);
+    return new Set();
   }
-
-  return result;
 }
 
 interface AppContextValue {
@@ -90,8 +71,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loansService.fetchAll(),
       paymentsService.fetchAll(),
       profilesService.listAll(),
+      fetchDeletedKeys(),
     ])
-      .then(async ([l0, p, profiles]) => {
+      .then(async ([l0, p, profiles, deletedKeys]) => {
         const normPh = (ph: string) => ph.replace(/\D/g, '').slice(-10);
         const map = new Map<string, string>();
         for (const pr of profiles) {
@@ -123,7 +105,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           bulkLoadLoans(l);
           bulkLoadPayments(p);
 
-          const missing = buildMissingPayments(l, p);
+          const missing = buildMissingPayments(l, p, deletedKeys);
           if (missing.length > 0) {
             try {
               await paymentsService.bulkUpsert(missing);
@@ -161,14 +143,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user?.id]); // user?.id — not user — so token refresh doesn't re-trigger a full reload
 
   // Re-run payment generation when a loan is added or deleted mid-session.
-  // Idempotent: buildMissingPayments skips months already in `payments`.
+  // Idempotent: buildMissingPayments skips months already present or deleted.
   useEffect(() => {
     if (loading || loans.length === 0) return;
-    const missing = buildMissingPayments(loans, payments);
-    if (missing.length === 0) return;
-    paymentsService.bulkUpsert(missing)
-      .catch((err) => console.warn('[AutoGen] Could not persist payments:', err))
-      .finally(() => bulkLoadPayments([...payments, ...missing]));
+    let cancelled = false;
+    (async () => {
+      const deletedKeys = await fetchDeletedKeys();
+      if (cancelled) return;
+      const missing = buildMissingPayments(loans, payments, deletedKeys);
+      if (missing.length === 0) return;
+      try {
+        await paymentsService.bulkUpsert(missing);
+      } catch (err) {
+        console.warn('[AutoGen] Could not persist payments:', err);
+      }
+      if (!cancelled) bulkLoadPayments([...payments, ...missing]);
+    })();
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loans.length]); // loans.length — fires only on add/delete, not on edit
 
