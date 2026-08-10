@@ -124,7 +124,11 @@ export const profilesService = {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
     for (const phone of newPhones) {
-      await guest.auth.signUp({ email: `${phone}@user.local`, password: phone });
+      await guest.auth.signUp({
+        email: `${phone}@user.local`,
+        password: phone,
+        options: { data: { phone } },
+      });
     }
   },
 
