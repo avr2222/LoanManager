@@ -17,7 +17,19 @@
 -- This migration hardens the trigger itself so a phone collision
 -- degrades gracefully (profile is created with phone left blank)
 -- instead of crashing the signup.
+--
+-- Also fixes the actual crash seen in production: handle_new_user()
+-- (already, in the pre-existing v2_06_triggers.sql version) sets
+-- updated_at = now() in its ON CONFLICT DO UPDATE clause, but
+-- public.profiles was never given an updated_at column (unlike
+-- contacts / loan_party_confirmations, which got one in
+-- v2_03_new_tables.sql). Every signup hit
+-- 42703 column "updated_at" of relation "profiles" does not exist,
+-- regardless of the phone logic above. Add the missing column.
 -- ============================================================
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
