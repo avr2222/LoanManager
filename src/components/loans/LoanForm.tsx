@@ -28,6 +28,8 @@ interface LoanFormProps {
   defaultMediatorPhone?: string;
   /** If true, mediator fields are read-only and loan type is forced to Through Mediator */
   lockMediator?: boolean;
+  /** If true, lender name is mandatory (the current user is not the lender) */
+  requireLender?: boolean;
 }
 
 const defaultForm = {
@@ -49,7 +51,7 @@ const defaultForm = {
   remarks: '',
 };
 
-export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLenderName, defaultLenderPhone, lockLender, defaultBorrowerName, defaultBorrowerPhone, lockBorrower, defaultMediatorName, defaultMediatorPhone, lockMediator }: LoanFormProps) {
+export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLenderName, defaultLenderPhone, lockLender, defaultBorrowerName, defaultBorrowerPhone, lockBorrower, defaultMediatorName, defaultMediatorPhone, lockMediator, requireLender }: LoanFormProps) {
   const { loans } = useLoans();
 
   // If myPhone is given (phone user), only suggest people from their own loans
@@ -166,6 +168,7 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
 
   function validate(): boolean {
     const errs: typeof errors = {};
+    if (requireLender && !form.lenderName.trim()) errs.lenderName = 'Required';
     if (!form.borrowerName.trim()) errs.borrowerName = 'Required';
     if (!form.principalAmount || form.principalAmount <= 0) errs.principalAmount = 'Must be > 0';
     if (!form.annualInterestRate || form.annualInterestRate <= 0) errs.annualInterestRate = 'Must be > 0';
@@ -214,13 +217,13 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
       <fieldset>
         <legend className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 pb-1 border-b border-slate-100 w-full">
           Lender Details{' '}
-          {defaultLenderPhone
-            ? <span className="normal-case font-normal text-emerald-500 ml-1">— you are the lender</span>
-            : <span className="normal-case font-normal text-slate-300 ml-1">(leave blank if you are the lender)</span>}
+          {defaultLenderPhone && (
+            <span className="normal-case font-normal text-emerald-500 ml-1">— you are the lender</span>
+          )}
         </legend>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Lender Name</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Lender Name{requireLender ? ' *' : ''}</label>
             <input
               className={`${inputClass('lenderName')} ${lockLender ? 'bg-slate-50 text-slate-500' : ''}`}
               value={form.lenderName}
@@ -228,6 +231,7 @@ export function LoanForm({ initialValues, onSubmit, onCancel, myPhone, defaultLe
               placeholder="Who gave the money?"
               readOnly={!!lockLender}
             />
+            {errors.lenderName && <p className="text-red-500 text-xs mt-1">{errors.lenderName}</p>}
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Lender Phone</label>

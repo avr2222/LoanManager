@@ -21,8 +21,8 @@ type RoleFilter = 'MyLoans' | 'All' | 'Lender' | 'Borrower' | 'Mediator';
 export function LoansPage() {
   const { t } = useTranslation();
   const { loading } = useApp();
-  const { loans, addLoan, updateLoan, deleteLoan, setLoanStatus } = useLoans();
-  const { isAdmin, hasFullAccess, userPhone, displayName, phone, adminPhone, user } = useAuth();
+  const { loans, updateLoan, deleteLoan, setLoanStatus } = useLoans();
+  const { isAdmin, hasFullAccess, userPhone, phone, adminPhone, user } = useAuth();
   const { payments, deletePaymentsByLoan, waiveFuturePendingByLoan } = usePayments();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
@@ -30,7 +30,6 @@ export function LoansPage() {
   const myPhone = (phone || adminPhone || '').replace(/\D/g, '').slice(-10);
   const [searchParams] = useSearchParams();
 
-  const [showForm, setShowForm] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | undefined>();
   const [deletingLoanId, setDeletingLoanId] = useState<string | null>(null);
   const [closingLoan, setClosingLoan] = useState<{ loanId: string; status: LoanStatus; waiveCount: number } | null>(null);
@@ -51,16 +50,6 @@ export function LoansPage() {
       .map(([phone, name]) => ({ phone, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [loans, isAdmin]);
-
-  async function handleAdd(loan: Loan) {
-    try {
-      const added = await addLoan(loan);
-      setShowForm(false);
-      showSuccess(t('loans.addSuccess', { id: added.loanId, name: added.borrowerName }));
-    } catch {
-      showError(t('loans.addFailed'));
-    }
-  }
 
   async function handleUpdate(loan: Loan) {
     try {
@@ -284,26 +273,13 @@ export function LoansPage() {
         onEdit={(loan) => setEditingLoan(loan)}
         onDelete={(id) => setDeletingLoanId(id)}
         onSetStatus={handleSetStatus}
-        onAdd={() => setShowForm(true)}
+        onAdd={() => navigate('/add-loan')}
         onRowClick={(loan) => navigate(`/loans/${loan.loanId}`)}
         readOnly={!isAdmin && !hasFullAccess}
         ownedLoanIds={ownedLoanIds}
         userPhone={userPhone}
         roleFilter={roleFilter}
       />
-
-      {/* Add Modal */}
-      {showForm && (
-        <Modal title={t('loans.addLoan')} onClose={() => setShowForm(false)} size="xl">
-          <LoanForm
-            onSubmit={handleAdd}
-            onCancel={() => setShowForm(false)}
-            defaultLenderName={!isAdmin ? displayName : undefined}
-            defaultLenderPhone={!isAdmin ? userPhone : undefined}
-            lockLender={!isAdmin}
-          />
-        </Modal>
-      )}
 
       {/* Edit Modal */}
       {editingLoan && (

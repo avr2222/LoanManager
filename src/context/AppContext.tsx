@@ -49,7 +49,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [autoImporting, setAutoImporting] = useState(false);
   const [profileMap, setProfileMap] = useState<Map<string, string>>(new Map());
-  const { user, isAdmin, displayName, adminPhone } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { loans, bulkLoadLoans } = useLoans();
   const { payments, bulkLoadPayments } = usePayments();
 
@@ -81,26 +81,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (pr.phone && name) map.set(normPh(pr.phone), name);
         }
         setProfileMap(map);
-        let l = l0;
+        const l = l0;
         if (l.length > 0) {
-          // If admin has a real name, backfill loans that have no lender name set
-          if (isAdmin && displayName && !displayName.includes('@')) {
-            const hasBlank = l.some((loan) => !loan.lenderName);
-            if (hasBlank) {
-              await loansService.fillBlankLenderName(displayName);
-              l = l.map((loan) => loan.lenderName ? loan : { ...loan, lenderName: displayName });
-            }
-            // If admin has a phone stored, backfill loans that have no lender phone set
-            if (adminPhone) {
-              const normalized = adminPhone.replace(/\D/g, '').slice(-10);
-              const hasBlankPhone = normalized && l.some((loan) => !loan.lenderPhone);
-              if (hasBlankPhone) {
-                await loansService.fillBlankLenderPhone(adminPhone);
-                l = l.map((loan) => loan.lenderPhone ? loan : { ...loan, lenderPhone: normalized });
-              }
-            }
-          }
-
           // Data already in Supabase — load it then auto-generate any missing payments
           bulkLoadLoans(l);
           bulkLoadPayments(p);

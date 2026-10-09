@@ -88,6 +88,12 @@ export function ForgotPasswordModal({ phone: initialPhone, onClose, onSuccess }:
       setStep('phone');
     } else if (data === 'no_security_question') {
       setError('No security question set for this account. Contact the admin.');
+    } else if (data === 'too_many_attempts') {
+      setError('Too many wrong answers. Try again in an hour, or contact the admin.');
+      setStep('question');
+      setAnswer('');
+    } else if (data === 'weak_password') {
+      setError('Password must be at least 8 characters');
     } else {
       setError('Something went wrong. Please try again.');
     }

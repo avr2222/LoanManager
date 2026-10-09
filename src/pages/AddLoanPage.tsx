@@ -7,24 +7,28 @@ import { LoanForm } from '@/components/loans/LoanForm';
 import { ChevronLeft } from 'lucide-react';
 import type { Loan } from '@/types';
 
-type MyRole = 'lender' | 'borrower' | 'mediator';
+type MyRole = 'lender' | 'borrower' | 'mediator' | 'other';
 
 const ROLE_LABELS: Record<MyRole, string> = {
   lender:   'I am the Lender',
   borrower: 'I am the Borrower',
   mediator: 'I am the Mediator',
+  other:    'Someone else lent',
 };
 
 export function AddLoanPage() {
   const navigate = useNavigate();
   const { addLoan } = useLoans();
-  const { phone, fullName, displayName } = useAuth();
+  const { phone, adminPhone, fullName, displayName, isAdmin } = useAuth();
   const { showSuccess, showError } = useToast();
 
-  const myPhone = phone.replace(/\D/g, '').slice(-10);
+  // Same phone the Loans page uses for "My Loans", so a loan added here as
+  // lender always shows up there.
+  const myPhone = (phone || adminPhone).replace(/\D/g, '').slice(-10);
   const myName  = fullName || displayName;
 
   const [myRole, setMyRole] = useState<MyRole>('lender');
+  const roles: MyRole[] = isAdmin ? ['lender', 'borrower', 'mediator', 'other'] : ['lender', 'borrower', 'mediator'];
 
   async function handleSubmit(loan: Loan) {
     try {
@@ -47,11 +51,16 @@ export function AddLoanPage() {
       defaultBorrowerName:  myName,
       defaultBorrowerPhone: myPhone,
       lockBorrower: !!myPhone,
+      requireLender: true,
     },
     mediator: {
       defaultMediatorName:  myName,
       defaultMediatorPhone: myPhone,
       lockMediator: !!myPhone,
+      requireLender: true,
+    },
+    other: {
+      requireLender: true,
     },
   };
 
@@ -69,7 +78,7 @@ export function AddLoanPage() {
 
         {/* Role selector */}
         <div className="flex flex-wrap gap-2 mb-5 p-1 bg-slate-100 rounded-xl w-fit">
-          {(Object.keys(ROLE_LABELS) as MyRole[]).map((role) => (
+          {roles.map((role) => (
             <button
               key={role}
               type="button"
@@ -85,11 +94,17 @@ export function AddLoanPage() {
           ))}
         </div>
 
+        {myRole === 'lender' && !myPhone && (
+          <p className="mb-4 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Your profile has no phone number, so this loan won't appear under My Loans. Add it from your profile (your avatar, top right) first, or enter it below.
+          </p>
+        )}
+
         <LoanForm
           key={myRole}
           onSubmit={handleSubmit}
           onCancel={() => navigate(-1)}
-          myPhone={myPhone}
+          myPhone={myRole === 'other' ? undefined : myPhone}
           {...roleProps[myRole]}
         />
       </div>

@@ -227,24 +227,6 @@ export const loansService = {
     }
     return data as string;
   },
-
-  async fillBlankLenderName(name: string): Promise<void> {
-    if (!name) return;
-    await supabase
-      .from('loans')
-      .update({ lender_name: name })
-      .or('lender_name.is.null,lender_name.eq.');
-  },
-
-  async fillBlankLenderPhone(phone: string): Promise<void> {
-    if (!phone) return;
-    const normalized = phone.replace(/\D/g, '').slice(-10);
-    if (!normalized) return;
-    await supabase
-      .from('loans')
-      .update({ lender_phone: normalized })
-      .or('lender_phone.is.null,lender_phone.eq.');
-  },
 };
 
 // ── Payments ───────────────────────────────────────────────────────────────────

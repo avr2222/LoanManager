@@ -3,7 +3,6 @@ import { Download, Upload, LogOut, User, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import { loansService } from '@/services/supabaseService';
 import { profilesService } from '@/services/profilesService';
 import { useToast } from './Toast';
 
@@ -47,10 +46,7 @@ export function Topbar({ title }: TopbarProps) {
     setSaving(true);
     const { error } = await updateProfile(nameInput.trim(), isAdmin ? phoneInput : undefined);
     if (error) { setSaving(false); showError(error); return; }
-    if (isAdmin) {
-      loansService.fillBlankLenderName(nameInput.trim()).catch(console.warn);
-      loansService.fillBlankLenderPhone(phoneInput.trim()).catch(console.warn);
-    } else if (user) {
+    if (!isAdmin && user) {
       profilesService.updateDisplayName(user.id, nameInput.trim()).catch(console.warn);
     }
     if (user) {

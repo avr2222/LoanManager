@@ -180,10 +180,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message };
 
     if (data.user) {
-      await supabase
-        .from('profiles')
-        .update({ security_question: question, security_answer: answer.trim().toLowerCase() })
-        .eq('id', data.user.id);
+      // Stored hashed in profile_secrets (see v2_23) — never on profiles.
+      const { error: secErr } = await supabase.rpc('set_security_question', {
+        p_question: question,
+        p_answer:   answer,
+      });
+      if (secErr) return { error: secErr.message };
       setUser(data.user);
     }
 
