@@ -1,18 +1,41 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Edit2, Trash2, Plus, Search, ChevronUp, ChevronDown, CheckCircle2, Download } from 'lucide-react';
-import type { Payment, PaymentStatus } from '@/types';
+import { Edit2, Trash2, Plus, Search, ChevronUp, ChevronDown, CheckCircle2, Download, Handshake } from 'lucide-react';
+import type { Loan, Payment, PaymentStatus } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { EmptyState } from '@/components/common/EmptyState';
 import { formatCurrency, formatDate } from '@/utils/formatUtils';
 import { useApp } from '@/context/AppContext';
 import { useLoans } from '@/context/LoanContext';
+import { useAuth } from '@/context/AuthContext';
 import { resolveProfileName } from '@/utils/profileUtils';
 import { compareMonthYear } from '@/utils/dateUtils';
 import { isOverduePayment } from '@/services/calculationService';
 
 type FilterValue = PaymentStatus | 'All' | 'Overdue' | 'Outstanding';
+
+const normPhone = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
+
+interface MediatorInfo {
+  name: string;
+  phone: string;
+  share: number;
+  /** The logged-in user is this loan's mediator */
+  isSelf: boolean;
+}
+
+/** Mediator details for a payment's loan, or null for Direct loans. */
+function getMediatorInfo(p: Payment, loan: Loan | undefined, myPhone: string, profileMap: Map<string, string>): MediatorInfo | null {
+  if (!loan || loan.loanType !== 'Through Mediator') return null;
+  const resolved = resolveProfileName(loan.mediatorName, loan.mediatorPhone, profileMap);
+  return {
+    name: resolved !== '—' ? resolved : (loan.mediatorPhone || 'Mediator'),
+    phone: loan.mediatorPhone ?? '',
+    share: p.mediatorShare,
+    isSelf: !!myPhone && normPhone(loan.mediatorPhone) === myPhone,
+  };
+}
 
 interface PaymentTableProps {
   payments: Payment[];
@@ -35,13 +58,30 @@ interface PaymentTableProps {
   onExport?: (filtered: Payment[]) => void;
 }
 
-type SortKey = 'monthYear' | 'loanId' | 'borrowerName' | 'netAmountExpected' | 'amountReceived' | 'daysOverdue' | 'paymentStatus' | 'dueDate';
+type SortKey = 'monthYear' | 'loanId' | 'borrowerName' | 'mediator' | 'netAmountExpected' | 'amountReceived' | 'daysOverdue' | 'paymentStatus' | 'dueDate';
 
 export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, readOnly, ownedLoanIds, canAdd = true, activeFilter, initialSearch, onBulkMarkPaid, onExport }: PaymentTableProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { profileMap } = useApp();
   const { loans } = useLoans();
+  const { userPhone, phone, adminPhone } = useAuth();
+  const myPhone = normPhone(userPhone || phone || adminPhone);
+  const loanMap = useMemo(() => new Map(loans.map((l) => [l.loanId, l])), [loans]);
+  // Resolve borrower + mediator once per payment so search, sort and render agree
+  const rowInfo = useMemo(() => {
+    const map = new Map<string, { borrower: string; mediator: MediatorInfo | null }>();
+    for (const p of payments) {
+      const loan = loanMap.get(p.loanId);
+      map.set(p.id, {
+        borrower: resolveProfileName(p.borrowerName, loan?.borrowerPhone, profileMap),
+        mediator: getMediatorInfo(p, loan, myPhone, profileMap),
+      });
+    }
+    return map;
+  }, [payments, loanMap, myPhone, profileMap]);
+  const borrowerOf = (p: Payment) => rowInfo.get(p.id)?.borrower ?? p.borrowerName;
+  const mediatorOf = (p: Payment) => rowInfo.get(p.id)?.mediator ?? null;
   // A row is editable if readOnly is false AND (no ownedLoanIds filter, or the payment's loan is owned by the current user)
   const canAct = (p: Payment) => !readOnly && (!ownedLoanIds || ownedLoanIds.has(p.loanId));
   const [search, setSearch] = useState(initialSearch ?? '');
@@ -63,13 +103,17 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
     }
   }, [activeFilter]);
 
+  const q = search.trim().toLowerCase();
   const filtered = payments
     .filter((p) => {
+      const med = mediatorOf(p);
       const matchSearch =
-        !search ||
-        p.borrowerName.toLowerCase().includes(search.toLowerCase()) ||
-        p.loanId.toLowerCase().includes(search.toLowerCase()) ||
-        p.monthYear.toLowerCase().includes(search.toLowerCase());
+        !q ||
+        p.borrowerName.toLowerCase().includes(q) ||
+        borrowerOf(p).toLowerCase().includes(q) ||
+        p.loanId.toLowerCase().includes(q) ||
+        p.monthYear.toLowerCase().includes(q) ||
+        (!!med && (med.name.toLowerCase().includes(q) || (/\d/.test(q) && med.phone.includes(q))));
       const matchStatus =
         statusFilter === 'All' ? true :
         statusFilter === 'Outstanding' ? (p.paymentStatus === 'Pending' || p.paymentStatus === 'Partial') :
@@ -78,12 +122,21 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
       return matchSearch && matchStatus;
     })
     .sort((a, b) => {
+      if (sortKey === 'mediator') {
+        // Direct loans (no mediator) always sink to the bottom
+        const am = mediatorOf(a)?.name;
+        const bm = mediatorOf(b)?.name;
+        if (!am || !bm) return (am ? 0 : 1) - (bm ? 0 : 1);
+        return sortAsc ? am.localeCompare(bm) : bm.localeCompare(am);
+      }
       const av = a[sortKey];
       const bv = b[sortKey];
       let cmp: number;
       if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv;
       // "May-2026" strings sort alphabetically, not chronologically — parse them
       else if (sortKey === 'monthYear') cmp = compareMonthYear(String(av), String(bv));
+      // Sort by the name actually shown (profile name may differ from the stored one)
+      else if (sortKey === 'borrowerName') cmp = borrowerOf(a).localeCompare(borrowerOf(b));
       else cmp = String(av).localeCompare(String(bv));
       return sortAsc ? cmp : -cmp;
     });
@@ -178,7 +231,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder={t('payments.searchPlaceholder')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); setMobilePage(1); setSelected(new Set()); }}
             className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
@@ -236,7 +289,9 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
         <>
           {/* Mobile card view — infinite scroll */}
           <div className="md:hidden space-y-3">
-            {mobileItems.map((p) => (
+            {mobileItems.map((p) => {
+              const med = mediatorOf(p);
+              return (
               <div
                 key={p.id}
                 className={`bg-white rounded-2xl border p-4 pr-14 md:pr-4 ${p.daysOverdue > 0 ? 'border-red-200 bg-red-50/40' : 'border-slate-100'}`}
@@ -244,7 +299,16 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <button onClick={() => navigate(`/loans/${p.loanId}`)} className="text-xs font-mono font-semibold text-indigo-500 hover:underline">{p.loanId}</button>
-                    <p className="text-sm font-semibold text-slate-800">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</p>
+                    <p className="text-sm font-semibold text-slate-800">{borrowerOf(p)}</p>
+                    {med && (
+                      <p className="flex flex-wrap items-center gap-x-1 text-xs text-amber-700 mt-0.5" title={med.phone || undefined}>
+                        <Handshake size={12} className="shrink-0" />
+                        <span>{med.isSelf ? t('payments.viaYou') : t('payments.viaMediator', { name: med.name })}</span>
+                        {med.share > 0 && (
+                          <span className="text-amber-600/80">· {t(med.isSelf ? 'payments.yourShare' : 'payments.mediatorShare', { amount: formatCurrency(med.share) })}</span>
+                        )}
+                      </p>
+                    )}
                     <p className="text-xs text-slate-400">{p.monthYear} · Due {formatDate(p.dueDate)}</p>
                   </div>
                   {canAct(p) && (
@@ -289,7 +353,8 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
             {/* Infinite scroll sentinel */}
             {hasMoreMobile && (
               <div ref={sentinelRef} className="py-4 flex justify-center">
@@ -340,6 +405,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                     )}
                     {th('loanId', 'Loan')}
                     {th('borrowerName', 'Borrower')}
+                    {th('mediator', t('payments.mediator'))}
                     {th('monthYear', 'Month')}
                     {th('dueDate', 'Due Date')}
                     {th('netAmountExpected', 'Expected')}
@@ -351,7 +417,9 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {paged.map((p) => (
+                  {paged.map((p) => {
+                    const med = mediatorOf(p);
+                    return (
                     <tr key={p.id} className={`hover:bg-slate-50/60 transition-colors ${p.daysOverdue > 0 ? 'bg-red-50/40' : ''}`}>
                       {bulkEnabled && (
                         <td className="px-4 py-3">
@@ -367,10 +435,32 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                         </td>
                       )}
                       <td className="px-4 py-3"><button onClick={() => navigate(`/loans/${p.loanId}`)} className="text-xs font-mono font-semibold text-indigo-500 hover:underline">{p.loanId}</button></td>
-                      <td className="px-4 py-3 text-sm text-slate-700">{resolveProfileName(p.borrowerName, loans.find(l => l.loanId === p.loanId)?.borrowerPhone, profileMap)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{borrowerOf(p)}</td>
+                      <td className="px-4 py-3">
+                        {med ? (
+                          <div title={med.phone || undefined}>
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded whitespace-nowrap">
+                              <Handshake size={12} className="shrink-0" />
+                              {med.isSelf ? t('payments.you') : med.name}
+                            </span>
+                            {med.share > 0 && (
+                              <div className="text-xs text-slate-400 mt-0.5 whitespace-nowrap">
+                                {t(med.isSelf ? 'payments.yourShare' : 'payments.mediatorShare', { amount: formatCurrency(med.share) })}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-300">{t('payments.direct')}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm text-slate-600">{p.monthYear}</td>
                       <td className="px-4 py-3 text-sm text-slate-500">{formatDate(p.dueDate)}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-slate-800">{formatCurrency(p.netAmountExpected)}</td>
+                      <td
+                        className="px-4 py-3 text-sm font-medium text-slate-800"
+                        title={med && med.share > 0 ? t('payments.expectedBreakdown', { interest: formatCurrency(p.interestAmount), share: formatCurrency(med.share), net: formatCurrency(p.netAmountExpected) }) : undefined}
+                      >
+                        {formatCurrency(p.netAmountExpected)}
+                      </td>
                       <td className="px-4 py-3 text-sm text-slate-600">{p.amountReceived > 0 ? formatCurrency(p.amountReceived) : <span className="text-xs text-slate-300">—</span>}</td>
                       <td className="px-4 py-3 text-sm font-medium text-red-500">{p.pendingAmount > 0 ? formatCurrency(p.pendingAmount) : <span className="text-xs font-normal text-slate-300">—</span>}</td>
                       <td className="px-4 py-3">
@@ -397,7 +487,8 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

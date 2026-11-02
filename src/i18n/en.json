@@ -149,7 +149,16 @@
     "selectedCount": "{{count}} selected",
     "markPaidSelected": "Mark Paid ({{count}})",
     "bulkMarkPaidSuccess": "{{count}} payment(s) marked as paid",
-    "paymentsCount": "{{count}} payment(s)"
+    "paymentsCount": "{{count}} payment(s)",
+    "searchPlaceholder": "Search borrower, mediator, loan or month…",
+    "mediator": "Mediator",
+    "direct": "Direct",
+    "you": "You",
+    "viaMediator": "Via {{name}}",
+    "viaYou": "Via you",
+    "mediatorShare": "{{amount}} share",
+    "yourShare": "{{amount}} your share",
+    "expectedBreakdown": "Interest {{interest}} − mediator share {{share}} = {{net}} expected"
   },
   "dashboard": {
     "loansGiven": "Loans Given",
