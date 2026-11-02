@@ -104,7 +104,7 @@
     "type": "Type",
     "actions": "Actions",
     "loanId": "Loan ID",
-    "searchLoans": "Search loans...",
+    "searchLoans": "Search borrower, mediator, lender or loan ID…",
     "myLoans": "My Loans",
     "allLoans": "All Loans",
     "asLender": "As Lender",
@@ -115,9 +115,6 @@
     "direct": "Direct",
     "viaMediator": "Via: {{name}}",
     "fromLender": "From: {{name}}",
-    "lenderLabel": "Lender",
-    "allLenders": "All Lenders ({{count}})",
-    "clearFilter": "Clear",
     "addSuccess": "Loan {{id}} added for {{name}}",
     "updateSuccess": "Loan updated successfully",
     "deleteSuccess": "Loan deleted",
@@ -221,5 +218,12 @@
     "export": "Export",
     "clear": "Clear",
     "viewAll": "View all"
+  },
+  "filters": {
+    "borrower": "Borrower",
+    "mediator": "Mediator",
+    "lender": "Lender",
+    "directOnly": "Direct (no mediator)",
+    "clear": "Clear filters"
   }
 }

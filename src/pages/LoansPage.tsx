@@ -12,6 +12,9 @@ import { LoanTable } from '@/components/loans/LoanTable';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import { PageSkeleton } from '@/components/common/Skeleton';
+import { PartyFilterBar } from '@/components/common/PartyFilterBar';
+import { usePartyFilters } from '@/hooks/usePartyFilters';
+import { matchesPartyFilters } from '@/utils/partyFilters';
 import { CalendarClock } from 'lucide-react';
 import { principalDueStatus, daysBetween } from '@/utils/dateUtils';
 import { formatCurrency, formatDate } from '@/utils/formatUtils';
@@ -37,20 +40,7 @@ export function LoansPage() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>(
     isAdmin && searchParams.get('all') === '1' ? 'All' : 'MyLoans'
   );
-  const [lenderFilter, setLenderFilter] = useState(''); // admin only: filter by lender phone
-
-  // Unique lenders in the system (admin only)
-  const knownLenders = useMemo(() => {
-    if (!isAdmin) return [];
-    const map = new Map<string, string>();
-    for (const l of loans) {
-      const p = (l.lenderPhone ?? '').replace(/\D/g, '').slice(-10);
-      if (p) map.set(p, l.lenderName || p);
-    }
-    return Array.from(map.entries())
-      .map(([phone, name]) => ({ phone, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [loans, isAdmin]);
+  const { filters: partyFilters, setFilter: setPartyFilter, clearFilters: clearPartyFilters } = usePartyFilters();
 
   async function handleAdd(loan: Loan) {
     try {
@@ -129,11 +119,7 @@ export function LoansPage() {
   // Role filter — default 'MyLoans' shows only loans where user has any role
   const roleFilteredLoans = useMemo(() => {
     const norm = (p?: string) => (p ?? '').replace(/\D/g, '').slice(-10);
-    let result = loans;
-    // Admin: filter by selected lender first
-    if (isAdmin && lenderFilter) {
-      result = result.filter((l) => norm(l.lenderPhone) === lenderFilter);
-    }
+    const result = loans;
     if (roleFilter === 'All') return result;
     if (roleFilter === 'MyLoans') {
       if (!myPhone) return []; // admin with no phone in any loan → no personal loans
@@ -148,21 +134,27 @@ export function LoansPage() {
     if (roleFilter === 'Borrower') return result.filter((l) => norm(l.borrowerPhone) === myPhone);
     if (roleFilter === 'Mediator') return result.filter((l) => norm(l.mediatorPhone) === myPhone);
     return result;
-  }, [loans, roleFilter, myPhone, isAdmin, lenderFilter]);
+  }, [loans, roleFilter, myPhone]);
+
+  // Borrower / mediator / lender dropdowns narrow the role-scoped list further
+  const filteredLoans = useMemo(
+    () => roleFilteredLoans.filter((l) => matchesPartyFilters(l, partyFilters)),
+    [roleFilteredLoans, partyFilters]
+  );
 
   const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
 
   // Loans whose principal is coming due (within 30 days) or already overdue —
-  // respects the active role/lender filter. Soonest / most-overdue first.
+  // respects the active role/party filters. Soonest / most-overdue first.
   const upcomingPrincipal = useMemo(() => {
-    return roleFilteredLoans
+    return filteredLoans
       .filter((l) => {
         if (l.loanStatus === 'Closed') return false;
         const s = principalDueStatus(l.principalDueDate);
         return s === 'overdue' || s === 'soon';
       })
       .sort((a, b) => String(a.principalDueDate).localeCompare(String(b.principalDueDate)));
-  }, [roleFilteredLoans]);
+  }, [filteredLoans]);
 
   // "overdue by N days" / "due today" / "in N days"
   function principalDueLabel(dueDate: string): string {
@@ -179,9 +171,9 @@ export function LoansPage() {
       {/* Summary strip */}
       <div className="grid grid-cols-3 gap-2 md:gap-3 mb-5">
         {[
-          { label: t('loans.totalLoans'),  value: roleFilteredLoans.length,                                             accent: 'from-slate-50  to-white',       dot: 'bg-slate-300'   },
-          { label: t('loans.active'),       value: roleFilteredLoans.filter((l) => l.loanStatus === 'Active').length,    accent: 'from-emerald-50 to-white',      dot: 'bg-emerald-400' },
-          { label: t('loans.closedOther'), value: roleFilteredLoans.filter((l) => l.loanStatus !== 'Active').length, accent: 'from-slate-50  to-white',       dot: 'bg-slate-300'   },
+          { label: t('loans.totalLoans'),  value: filteredLoans.length,                                             accent: 'from-slate-50  to-white',       dot: 'bg-slate-300'   },
+          { label: t('loans.active'),       value: filteredLoans.filter((l) => l.loanStatus === 'Active').length,    accent: 'from-emerald-50 to-white',      dot: 'bg-emerald-400' },
+          { label: t('loans.closedOther'), value: filteredLoans.filter((l) => l.loanStatus !== 'Active').length, accent: 'from-slate-50  to-white',       dot: 'bg-slate-300'   },
         ].map(({ label, value, accent, dot }) => (
           <div key={label} className={`bg-gradient-to-br ${accent} rounded-2xl border border-slate-200/60 shadow-sm px-3 md:px-5 py-3 md:py-4`}>
             <div className="flex items-center gap-1.5 mb-1.5">
@@ -192,33 +184,6 @@ export function LoansPage() {
           </div>
         ))}
       </div>
-
-      {/* Lender selector — admin only */}
-      {isAdmin && knownLenders.length > 1 && (
-        <div className="flex items-center gap-2 mb-3">
-          <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest shrink-0">{t('loans.lenderLabel')}</label>
-          <select
-            value={lenderFilter}
-            onChange={(e) => setLenderFilter(e.target.value)}
-            className="text-sm border border-slate-200 rounded-xl px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-          >
-            <option value="">{t('loans.allLenders', { count: knownLenders.length })}</option>
-            {knownLenders.map(({ phone, name }) => (
-              <option key={phone} value={phone}>
-                {name} — {phone}
-              </option>
-            ))}
-          </select>
-          {lenderFilter && (
-            <button
-              onClick={() => setLenderFilter('')}
-              className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors"
-            >
-              {t('loans.clearFilter')}
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Role filter chips */}
       <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
@@ -237,6 +202,15 @@ export function LoansPage() {
           </button>
         ))}
       </div>
+
+      {/* Borrower / mediator / lender filters */}
+      <PartyFilterBar
+        loans={roleFilteredLoans}
+        allLoans={loans}
+        filters={partyFilters}
+        onChange={setPartyFilter}
+        onClear={clearPartyFilters}
+      />
 
       {/* Upcoming principal repayments */}
       {upcomingPrincipal.length > 0 && (
@@ -280,7 +254,7 @@ export function LoansPage() {
       )}
 
       <LoanTable
-        loans={roleFilteredLoans}
+        loans={filteredLoans}
         onEdit={(loan) => setEditingLoan(loan)}
         onDelete={(id) => setDeletingLoanId(id)}
         onSetStatus={handleSetStatus}

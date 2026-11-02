@@ -16,6 +16,9 @@ import { exportPaymentsView } from '@/services/excelService';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import { PageSkeleton } from '@/components/common/Skeleton';
+import { PartyFilterBar } from '@/components/common/PartyFilterBar';
+import { usePartyFilters } from '@/hooks/usePartyFilters';
+import { matchesPartyFilters } from '@/utils/partyFilters';
 import { useTranslation } from 'react-i18next';
 
 export function PaymentsPage() {
@@ -56,7 +59,22 @@ export function PaymentsPage() {
     );
   }, [isAdmin, showAll, loans, phone, adminPhone]);
 
-  const visiblePayments = myLoanIds ? payments.filter((p) => myLoanIds.has(p.loanId)) : payments;
+  const scopedPayments = useMemo(
+    () => (myLoanIds ? payments.filter((p) => myLoanIds.has(p.loanId)) : payments),
+    [payments, myLoanIds]
+  );
+
+  // Borrower / mediator / lender filters — options come from loans that have payments in scope
+  const { filters: partyFilters, setFilter: setPartyFilter, clearFilters: clearPartyFilters } = usePartyFilters();
+  const loanMap = useMemo(() => new Map(loans.map((l) => [l.loanId, l])), [loans]);
+  const scopedLoans = useMemo(() => {
+    const ids = new Set(scopedPayments.map((p) => p.loanId));
+    return loans.filter((l) => ids.has(l.loanId));
+  }, [loans, scopedPayments]);
+  const visiblePayments = useMemo(
+    () => scopedPayments.filter((p) => matchesPartyFilters(loanMap.get(p.loanId), partyFilters)),
+    [scopedPayments, loanMap, partyFilters]
+  );
 
   const { showSuccess, showError } = useToast();
   const { t } = useTranslation();
@@ -183,6 +201,14 @@ export function PaymentsPage() {
           );
         })}
       </div>
+
+      <PartyFilterBar
+        loans={scopedLoans}
+        allLoans={loans}
+        filters={partyFilters}
+        onChange={setPartyFilter}
+        onClear={clearPartyFilters}
+      />
 
       <PaymentTable
         payments={visiblePayments}

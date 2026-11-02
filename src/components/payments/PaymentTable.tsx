@@ -89,7 +89,7 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>('dueDate');
   const [sortAsc, setSortAsc] = useState(true);
-  const [page, setPage] = useState(1);           // desktop pagination
+  const [rawPage, setPage] = useState(1);        // desktop pagination
   const [mobilePage, setMobilePage] = useState(1); // mobile infinite scroll
   const PAGE_SIZE = 25;
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -142,6 +142,8 @@ export function PaymentTable({ payments, onEdit, onDelete, onAdd, onMarkPaid, re
     });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  // Clamp so a shrinking list (new filter / search) never leaves us on an empty page
+  const page = Math.min(rawPage, Math.max(1, totalPages));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE); // desktop
   const mobileItems = filtered.slice(0, mobilePage * PAGE_SIZE);           // mobile cumulative
   const hasMoreMobile = mobileItems.length < filtered.length;
