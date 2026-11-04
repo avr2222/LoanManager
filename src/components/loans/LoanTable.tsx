@@ -74,18 +74,21 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
   const [statusFilter, setStatusFilter] = useState<LoanStatus | 'All'>('Active');
   const [sortKey, setSortKey] = useState<SortKey>('loanId');
   const [sortAsc, setSortAsc] = useState(true);
-  const [page, setPage] = useState(1);           // desktop pagination
+  const [rawPage, setPage] = useState(1);        // desktop pagination
   const [mobilePage, setMobilePage] = useState(1); // mobile infinite scroll
   const PAGE_SIZE = 25;
   const sentinelRef = useRef<HTMLDivElement>(null);
 
+  const q = search.trim().toLowerCase();
   const filtered = loans
     .filter((l) => {
       const matchSearch =
-        !search ||
-        l.borrowerName.toLowerCase().includes(search.toLowerCase()) ||
-        l.loanId.toLowerCase().includes(search.toLowerCase()) ||
-        l.borrowerPhone.includes(search);
+        !q ||
+        l.borrowerName.toLowerCase().includes(q) ||
+        l.loanId.toLowerCase().includes(q) ||
+        l.borrowerPhone.includes(q) ||
+        (l.loanType === 'Through Mediator' && (l.mediatorName ?? '').toLowerCase().includes(q)) ||
+        (l.lenderName ?? '').toLowerCase().includes(q);
       const matchStatus = statusFilter === 'All' || l.loanStatus === statusFilter;
       return matchSearch && matchStatus;
     })
@@ -97,6 +100,8 @@ export function LoanTable({ loans, onEdit, onDelete, onSetStatus, onAdd, onRowCl
     });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  // Clamp so a shrinking list (new filter / search) never leaves us on an empty page
+  const page = Math.min(rawPage, Math.max(1, totalPages));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE); // desktop
   const mobileItems = filtered.slice(0, mobilePage * PAGE_SIZE);           // mobile cumulative
   const hasMoreMobile = mobileItems.length < filtered.length;
