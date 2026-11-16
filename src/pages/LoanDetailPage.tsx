@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLoans } from '@/context/LoanContext';
 import { usePayments } from '@/context/PaymentContext';
@@ -16,6 +16,7 @@ import { formatCurrency, formatDate, ordinal } from '@/utils/formatUtils';
 import { compareMonthYear } from '@/utils/dateUtils';
 import { useApp } from '@/context/AppContext';
 import { resolveProfileName } from '@/utils/profileUtils';
+import { PageSkeleton } from '@/components/common/Skeleton';
 import { ChevronLeft, CheckCircle, XCircle, Clock, Edit2, MessageSquare, Smartphone, ArrowRight } from 'lucide-react';
 import type { Loan } from '@/types';
 
@@ -102,7 +103,7 @@ export function LoanDetailPage() {
   const { loans, updateLoan } = useLoans();
   const { payments } = usePayments();
   const { phone, user, isSuperAdmin, hasFullAccess } = useAuth();
-  const { profileMap } = useApp();
+  const { profileMap, loading: dataLoading } = useApp();
   const { claimPayment } = usePayments();
   const { showSuccess, showError } = useToast();
 
@@ -147,6 +148,10 @@ export function LoanDetailPage() {
     profilesService.getUpiIdByPhone(payPhone).then(setPayUpiId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loan?.loanId]);
+
+  // Loans are still loading (e.g. the page was opened or refreshed directly) —
+  // don't flash "Loan not found" before the data arrives.
+  if (dataLoading) return <PageSkeleton />;
 
   if (!loan) {
     return (
@@ -221,12 +226,11 @@ export function LoanDetailPage() {
   const offlineConf = confirmations.find((x) => x.id === offlineConfirmId);
 
   // Earliest unclaimed/unpaid payment — used for the UPI pay flow
-  const targetPayment = useMemo(() =>
-    [...loanPayments]
-      .filter((p) => p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && p.paymentStatus !== 'Claimed')
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0],
-    [loanPayments]
-  );
+  // Plain computation, not a hook: this runs after the early returns above, and
+  // a hook here would change the hook count between renders and crash the page.
+  const targetPayment = [...loanPayments]
+    .filter((p) => p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && p.paymentStatus !== 'Claimed')
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
 
   function openUpiModal() {
     setUpiStep('initiate');

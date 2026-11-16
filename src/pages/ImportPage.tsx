@@ -1,10 +1,13 @@
 import { useRef, useState } from 'react';
-import { Upload, FileSpreadsheet, Trash2, Download, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { Upload, FileSpreadsheet, Trash2, Download, AlertTriangle, RotateCcw } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useLoans } from '@/context/LoanContext';
 import { useToast } from '@/components/common/Toast';
 
 export function ImportPage() {
+  const { t } = useTranslation();
   const { importFile, exportData, clearAllData } = useApp();
   const { loans } = useLoans();
   const { showSuccess, showError } = useToast();
@@ -134,6 +137,20 @@ export function ImportPage() {
           </button>
         </div>
       )}
+
+      {/* Trash — restore deleted records (the mobile bottom bar has no room for it) */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5">
+        <h3 className="font-semibold text-slate-800 mb-1.5 flex items-center gap-2 text-sm">
+          <RotateCcw size={16} /> {t('trash.importCardTitle')}
+        </h3>
+        <p className="text-sm text-slate-500 mb-4">{t('trash.importCardText')}</p>
+        <Link
+          to="/trash"
+          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 w-full sm:w-auto justify-center"
+        >
+          <Trash2 size={15} /> {t('trash.openTrash')}
+        </Link>
+      </div>
 
       {/* Danger Zone */}
       {hasData && (

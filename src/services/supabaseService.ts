@@ -285,6 +285,29 @@ export const paymentsService = {
     if (error) throw error;
   },
 
+  /** Update existing payments (e.g. re-priced amounts). Unlike bulkUpsert this
+   *  overwrites on conflict — bulkUpsert ignores duplicates and cannot update. */
+  async upsertMany(payments: Payment[]): Promise<void> {
+    if (payments.length === 0) return;
+    const { error } = await supabase.from('payments').upsert(payments.map(toDbPayment));
+    if (error) throw error;
+  },
+
+  /** `${loanId}::${monthYear}` of soft-deleted payments on the caller's loans.
+   *  RLS hides deleted rows from everyone except the super admin, so this goes
+   *  through a SECURITY DEFINER RPC (v2_23). Falls back to a direct read (which
+   *  only returns rows for the super admin) while that migration isn't installed. */
+  async fetchDeletedKeys(): Promise<Set<string>> {
+    const { data, error } = await supabase.rpc('get_deleted_payment_keys');
+    if (!error && Array.isArray(data)) {
+      return new Set(
+        (data as { loan_id: string; month_year: string }[]).map((r) => `${r.loan_id}::${r.month_year}`)
+      );
+    }
+    const deleted = await this.fetchDeleted();
+    return new Set(deleted.map((p) => `${p.loanId}::${p.monthYear}`));
+  },
+
   /** Soft-delete a single payment */
   async delete(id: string): Promise<void> {
     const { error } = await supabase
@@ -331,6 +354,18 @@ export const paymentsService = {
       .from('payments')
       .update({ deleted_at: null, deleted_by: null })
       .eq('id', id);
+    if (error) throw error;
+  },
+
+  /** Restore the payments that were soft-deleted together with their loan
+   *  (deleted at or after `sinceIso`). Payments deleted individually before
+   *  that stay in the trash. */
+  async restoreByLoan(loanId: string, sinceIso: string): Promise<void> {
+    const { error } = await supabase
+      .from('payments')
+      .update({ deleted_at: null, deleted_by: null })
+      .eq('loan_id', loanId)
+      .gte('deleted_at', sinceIso);
     if (error) throw error;
   },
 

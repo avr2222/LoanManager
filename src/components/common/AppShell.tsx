@@ -23,6 +23,7 @@ export function AppShell() {
     '/mediators': 'Mediators',
     '/users':     t('nav.users'),
     '/import':    t('nav.import'),
+    '/trash':     t('nav.trash'),
   };
 
   const title = pageTitles[location.pathname] ?? t('nav.loanBook');
