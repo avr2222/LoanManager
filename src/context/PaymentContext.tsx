@@ -9,6 +9,7 @@ type PaymentAction =
   | { type: 'BULK_LOAD'; payload: Payment[] }
   | { type: 'ADD'; payload: Payment }
   | { type: 'UPDATE'; payload: Payment }
+  | { type: 'UPDATE_MANY'; payload: Payment[] }
   | { type: 'DELETE'; payload: string }
   | { type: 'DELETE_BY_LOAN'; payload: string }
   | { type: 'WAIVE_FUTURE_BY_LOAN'; payload: { loanId: string; fromDate: string } };
@@ -23,6 +24,10 @@ function paymentReducer(state: Payment[], action: PaymentAction): Payment[] {
       return state.map((p) =>
         p.id === action.payload.id ? derivePaymentFields(action.payload) : p
       );
+    case 'UPDATE_MANY': {
+      const byId = new Map(action.payload.map((p) => [p.id, p]));
+      return state.map((p) => (byId.has(p.id) ? derivePaymentFields(byId.get(p.id)!) : p));
+    }
     case 'DELETE':
       return state.filter((p) => p.id !== action.payload);
     case 'DELETE_BY_LOAN':
@@ -46,6 +51,10 @@ interface PaymentContextValue {
   payments: Payment[];
   addPayment: (payment: Payment) => Promise<void>;
   updatePayment: (payment: Payment) => Promise<void>;
+  /** Save several changed payments (e.g. re-priced amounts) in one request. */
+  savePayments: (payments: Payment[]) => Promise<void>;
+  /** Update local state only — for changes already written by an RPC. */
+  applyPaymentsLocal: (payments: Payment[]) => void;
   claimPayment: (payment: Payment, utrNumber: string) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
   restorePayment: (id: string) => Promise<void>;
@@ -69,6 +78,17 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
     const derived = derivePaymentFields(payment);
     await paymentsService.upsert(derived);
     dispatch({ type: 'UPDATE', payload: derived });
+  }, []);
+
+  const savePayments = useCallback(async (changed: Payment[]) => {
+    if (changed.length === 0) return;
+    await paymentsService.upsertMany(changed);
+    dispatch({ type: 'UPDATE_MANY', payload: changed });
+  }, []);
+
+  const applyPaymentsLocal = useCallback((changed: Payment[]) => {
+    if (changed.length === 0) return;
+    dispatch({ type: 'UPDATE_MANY', payload: changed });
   }, []);
 
   const claimPayment = useCallback(async (payment: Payment, utrNumber: string) => {
@@ -116,7 +136,7 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <PaymentContext.Provider value={{ payments, addPayment, updatePayment, claimPayment, deletePayment, restorePayment, deletePaymentsByLoan, waiveFuturePendingByLoan, bulkLoadPayments }}>
+    <PaymentContext.Provider value={{ payments, addPayment, updatePayment, savePayments, applyPaymentsLocal, claimPayment, deletePayment, restorePayment, deletePaymentsByLoan, waiveFuturePendingByLoan, bulkLoadPayments }}>
       {children}
     </PaymentContext.Provider>
   );

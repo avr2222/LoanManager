@@ -9,6 +9,9 @@ import { Modal } from '@/components/common/Modal';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { LoanForm } from '@/components/loans/LoanForm';
 import { LoanTable } from '@/components/loans/LoanTable';
+import { CloseLoanDialog } from '@/components/loans/CloseLoanDialog';
+import { useUpdateLoan } from '@/hooks/useUpdateLoan';
+import { principalService } from '@/services/principalService';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import { PageSkeleton } from '@/components/common/Skeleton';
@@ -24,7 +27,8 @@ type RoleFilter = 'MyLoans' | 'All' | 'Lender' | 'Borrower' | 'Mediator';
 export function LoansPage() {
   const { t } = useTranslation();
   const { loading } = useApp();
-  const { loans, addLoan, updateLoan, deleteLoan, setLoanStatus } = useLoans();
+  const { loans, addLoan, deleteLoan, setLoanStatus } = useLoans();
+  const updateLoanAndReprice = useUpdateLoan();
   const { isAdmin, hasFullAccess, userPhone, displayName, phone, adminPhone, user } = useAuth();
   const { payments, deletePaymentsByLoan, waiveFuturePendingByLoan } = usePayments();
   const { showSuccess, showError } = useToast();
@@ -54,9 +58,14 @@ export function LoansPage() {
 
   async function handleUpdate(loan: Loan) {
     try {
-      await updateLoan(loan);
+      const { repricedCount, repriceFailed } = await updateLoanAndReprice(loan);
       setEditingLoan(undefined);
-      showSuccess(t('loans.updateSuccess'));
+      showSuccess(
+        repricedCount > 0
+          ? `${t('loans.updateSuccess')} — ${t('loans.pendingRepriced', { count: repricedCount })}`
+          : t('loans.updateSuccess')
+      );
+      if (repriceFailed) showError(t('loans.repriceFailed'));
     } catch {
       showError(t('loans.updateFailed'));
     }
@@ -86,7 +95,12 @@ export function LoansPage() {
     void handleSetStatusConfirmed(loanId, status);
   }
 
-  async function handleSetStatusConfirmed(loanId: string, status: LoanStatus) {
+  async function handleSetStatusConfirmed(
+    loanId: string,
+    status: LoanStatus,
+    /** Principal that came back at closure — recorded in the loan's principal ledger */
+    received?: { amount: number; date: string },
+  ) {
     try {
       await setLoanStatus(loanId, status);
       if (status === 'Closed') {
@@ -95,6 +109,15 @@ export function LoansPage() {
           ? t('loans.closedWithWaived', { count: waived, defaultValue: `Loan closed. ${waived} upcoming payment${waived === 1 ? '' : 's'} waived.` })
           : t('loans.statusSuccess', { status })
         );
+        if (received) {
+          // The loan is already closed at this point; a failure here must not
+          // look like the close itself failed.
+          try {
+            await principalService.record({ loanId, type: 'Closure', amount: received.amount, date: received.date });
+          } catch (err) {
+            showError(t('loans.closureNotRecorded', { reason: err instanceof Error ? err.message : '' }));
+          }
+        }
       } else {
         showSuccess(t('loans.statusSuccess', { status }));
       }
@@ -143,6 +166,7 @@ export function LoansPage() {
   );
 
   const deletingLoan = loans.find((l) => l.loanId === deletingLoanId);
+  const closingLoanRecord = closingLoan ? loans.find((l) => l.loanId === closingLoan.loanId) : undefined;
 
   // Loans whose principal is coming due (within 30 days) or already overdue —
   // respects the active role/party filters. Soonest / most-overdue first.
@@ -303,18 +327,12 @@ export function LoansPage() {
         />
       )}
 
-      {/* Close Loan Confirm */}
-      {closingLoan && (
-        <ConfirmDialog
-          title="Close Loan"
-          message={
-            closingLoan.waiveCount > 0
-              ? `Closing loan ${closingLoan.loanId} will waive ${closingLoan.waiveCount} upcoming pending payment${closingLoan.waiveCount === 1 ? '' : 's'}. Continue?`
-              : `Mark loan ${closingLoan.loanId} as Closed?`
-          }
-          confirmLabel="Close Loan"
-          danger={false}
-          onConfirm={() => handleSetStatusConfirmed(closingLoan.loanId, closingLoan.status)}
+      {/* Close Loan — also captures the principal received */}
+      {closingLoan && closingLoanRecord && (
+        <CloseLoanDialog
+          loan={closingLoanRecord}
+          waiveCount={closingLoan.waiveCount}
+          onConfirm={(received) => handleSetStatusConfirmed(closingLoan.loanId, closingLoan.status, received)}
           onCancel={() => setClosingLoan(null)}
         />
       )}

@@ -62,6 +62,25 @@ export interface Payment {
   deletedBy?: string | null;        // phone or email of who deleted it
 }
 
+// ── Principal ledger ──────────────────────────────────────────────────────────
+
+/** Repayment / TopUp change the loan's outstanding principal.
+ *  Closure records what came back when the loan was closed (loan is untouched). */
+export type PrincipalTxnType = 'Repayment' | 'TopUp' | 'Closure';
+
+export interface PrincipalTxn {
+  id: string;                       // uuid
+  loanId: string;
+  txnType: PrincipalTxnType;
+  amount: number;                   // ₹, always positive
+  txnDate: string;                  // ISO date
+  principalBefore: number;
+  principalAfter: number;
+  remarks: string;
+  createdBy?: string | null;        // auth.users.id
+  createdAt: string;                // ISO timestamp
+}
+
 // ── Audit Log ─────────────────────────────────────────────────────────────────
 
 export interface AuditLog {

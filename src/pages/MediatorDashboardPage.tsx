@@ -21,6 +21,7 @@ import { exportUserPDF } from '@/services/pdfService';
 import { derivePaymentFields } from '@/services/calculationService';
 import { useApp } from '@/context/AppContext';
 import { resolveProfileName } from '@/utils/profileUtils';
+import { useUpdateLoan } from '@/hooks/useUpdateLoan';
 
 function norm(phone: string) {
   return phone.replace(/\D/g, '').slice(-10);
@@ -85,7 +86,8 @@ interface BorrowerGroup {
 
 export function MediatorDashboardPage() {
   const { t } = useTranslation();
-  const { loans, updateLoan, deleteLoan } = useLoans();
+  const { loans, deleteLoan } = useLoans();
+  const updateLoanAndReprice = useUpdateLoan();
   const { payments, updatePayment, deletePaymentsByLoan } = usePayments();
   const { userPhone, hasFullAccess, isAdmin, profile, phone: profilePhone, adminPhone } = useAuth();
   const { profileMap, loading } = useApp();
@@ -318,9 +320,14 @@ const expected  = mp.reduce((s, p) => s + p.netAmountExpected, 0);
 
   async function handleUpdateLoan(loan: Loan) {
     try {
-      await updateLoan(loan);
+      const { repricedCount, repriceFailed } = await updateLoanAndReprice(loan);
       setEditingLoan(undefined);
-      showSuccess('Loan updated');
+      showSuccess(
+        repricedCount > 0
+          ? `${t('loans.updateSuccess')} — ${t('loans.pendingRepriced', { count: repricedCount })}`
+          : t('loans.updateSuccess')
+      );
+      if (repriceFailed) showError(t('loans.repriceFailed'));
     } catch {
       showError('Failed to update loan');
     }

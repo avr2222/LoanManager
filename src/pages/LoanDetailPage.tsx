@@ -6,6 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/common/Toast';
 import { Modal } from '@/components/common/Modal';
 import { LoanForm } from '@/components/loans/LoanForm';
+import { PrincipalLedger } from '@/components/loans/PrincipalLedger';
+import { useUpdateLoan } from '@/hooks/useUpdateLoan';
 import {
   confirmationsService,
   type PartyConfirmation,
@@ -16,7 +18,6 @@ import { formatCurrency, formatDate, ordinal } from '@/utils/formatUtils';
 import { compareMonthYear } from '@/utils/dateUtils';
 import { useApp } from '@/context/AppContext';
 import { resolveProfileName } from '@/utils/profileUtils';
-import { PageSkeleton } from '@/components/common/Skeleton';
 import { ChevronLeft, CheckCircle, XCircle, Clock, Edit2, MessageSquare, Smartphone, ArrowRight } from 'lucide-react';
 import type { Loan } from '@/types';
 
@@ -100,10 +101,11 @@ const ROLE_LABEL: Record<string, string> = { lender: 'Lender', borrower: 'Borrow
 export function LoanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { loans, updateLoan } = useLoans();
+  const { loans } = useLoans();
+  const updateLoanAndReprice = useUpdateLoan();
   const { payments } = usePayments();
   const { phone, user, isSuperAdmin, hasFullAccess } = useAuth();
-  const { profileMap, loading: dataLoading } = useApp();
+  const { profileMap } = useApp();
   const { claimPayment } = usePayments();
   const { showSuccess, showError } = useToast();
 
@@ -148,10 +150,6 @@ export function LoanDetailPage() {
     profilesService.getUpiIdByPhone(payPhone).then(setPayUpiId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loan?.loanId]);
-
-  // Loans are still loading (e.g. the page was opened or refreshed directly) —
-  // don't flash "Loan not found" before the data arrives.
-  if (dataLoading) return <PageSkeleton />;
 
   if (!loan) {
     return (
@@ -200,9 +198,14 @@ export function LoanDetailPage() {
 
   async function handleUpdate(updated: Loan) {
     try {
-      await updateLoan(updated);
+      const { repricedCount, repriceFailed } = await updateLoanAndReprice(updated);
       setEditing(false);
-      showSuccess('Loan updated');
+      showSuccess(
+        repricedCount > 0
+          ? `Loan updated — ${repricedCount} pending payment${repricedCount === 1 ? '' : 's'} updated to the new amount`
+          : 'Loan updated'
+      );
+      if (repriceFailed) showError('Loan saved, but pending payments could not be updated to the new amount');
       // Reload confirmations — edit may have reset them
       const rows = await confirmationsService.fetchByLoan(updated.loanId);
       setConfirmations(rows);
@@ -222,12 +225,17 @@ export function LoanDetailPage() {
     : 'Pending';
 
   const canEdit = hasFullAccess && isCreator && overallStatus !== 'All Confirmed';
+  // Principal repayments / top-ups: admin, creator or the lender — and unlike
+  // an edit of terms, still allowed once every party has confirmed the loan.
+  const isLender = !!myNormPhone && loan.lenderPhone?.replace(/\D/g, '').slice(-10) === myNormPhone;
+  const canManagePrincipal = hasFullAccess && (isCreator || isLender);
   const isBorrower = !!myNormPhone && loan.borrowerPhone?.replace(/\D/g, '').slice(-10) === myNormPhone;
   const offlineConf = confirmations.find((x) => x.id === offlineConfirmId);
 
   // Earliest unclaimed/unpaid payment — used for the UPI pay flow
-  // Plain computation, not a hook: this runs after the early returns above, and
-  // a hook here would change the hook count between renders and crash the page.
+  // Plain computation, not a hook: this runs after the early return above, and
+  // a hook here would change the hook count if `loan` appeared or disappeared
+  // while the page is mounted.
   const targetPayment = [...loanPayments]
     .filter((p) => p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && p.paymentStatus !== 'Claimed')
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
@@ -350,6 +358,9 @@ export function LoanDetailPage() {
           <p className="mt-3 text-xs text-slate-500 italic border-t border-slate-100 pt-3">{loan.remarks}</p>
         )}
       </div>
+
+      {/* Principal ledger — repayments, top-ups, closure */}
+      <PrincipalLedger key={loan.loanId} loan={loan} canManage={canManagePrincipal} />
 
       {/* Confirmation Panel */}
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
