@@ -7,6 +7,7 @@ import { LoansPage } from '@/pages/LoansPage';
 import { PaymentsPage } from '@/pages/PaymentsPage';
 import { ImportPage } from '@/pages/ImportPage';
 import { UsersPage } from '@/pages/UsersPage';
+import { TrashPage } from '@/pages/TrashPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
@@ -64,6 +65,7 @@ export function AppRouter() {
           <Route path="payments"     element={<PaymentsPage />} />
           <Route path="users"        element={<AdminOnly><UsersPage /></AdminOnly>} />
           <Route path="import"       element={<AdminOnly><ImportPage /></AdminOnly>} />
+          <Route path="trash"        element={<AdminOnly><TrashPage /></AdminOnly>} />
         </Route>
       </Routes>
     </HashRouter>

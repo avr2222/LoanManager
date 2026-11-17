@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLoans } from '@/context/LoanContext';
 import { usePayments } from '@/context/PaymentContext';
@@ -6,6 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/common/Toast';
 import { Modal } from '@/components/common/Modal';
 import { LoanForm } from '@/components/loans/LoanForm';
+import { PrincipalLedger } from '@/components/loans/PrincipalLedger';
+import { useUpdateLoan } from '@/hooks/useUpdateLoan';
 import {
   confirmationsService,
   type PartyConfirmation,
@@ -99,7 +101,8 @@ const ROLE_LABEL: Record<string, string> = { lender: 'Lender', borrower: 'Borrow
 export function LoanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { loans, updateLoan } = useLoans();
+  const { loans } = useLoans();
+  const updateLoanAndReprice = useUpdateLoan();
   const { payments } = usePayments();
   const { phone, user, isSuperAdmin, hasFullAccess } = useAuth();
   const { profileMap } = useApp();
@@ -195,9 +198,14 @@ export function LoanDetailPage() {
 
   async function handleUpdate(updated: Loan) {
     try {
-      await updateLoan(updated);
+      const { repricedCount, repriceFailed } = await updateLoanAndReprice(updated);
       setEditing(false);
-      showSuccess('Loan updated');
+      showSuccess(
+        repricedCount > 0
+          ? `Loan updated — ${repricedCount} pending payment${repricedCount === 1 ? '' : 's'} updated to the new amount`
+          : 'Loan updated'
+      );
+      if (repriceFailed) showError('Loan saved, but pending payments could not be updated to the new amount');
       // Reload confirmations — edit may have reset them
       const rows = await confirmationsService.fetchByLoan(updated.loanId);
       setConfirmations(rows);
@@ -217,16 +225,20 @@ export function LoanDetailPage() {
     : 'Pending';
 
   const canEdit = hasFullAccess && isCreator && overallStatus !== 'All Confirmed';
+  // Principal repayments / top-ups: admin, creator or the lender — and unlike
+  // an edit of terms, still allowed once every party has confirmed the loan.
+  const isLender = !!myNormPhone && loan.lenderPhone?.replace(/\D/g, '').slice(-10) === myNormPhone;
+  const canManagePrincipal = hasFullAccess && (isCreator || isLender);
   const isBorrower = !!myNormPhone && loan.borrowerPhone?.replace(/\D/g, '').slice(-10) === myNormPhone;
   const offlineConf = confirmations.find((x) => x.id === offlineConfirmId);
 
   // Earliest unclaimed/unpaid payment — used for the UPI pay flow
-  const targetPayment = useMemo(() =>
-    [...loanPayments]
-      .filter((p) => p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && p.paymentStatus !== 'Claimed')
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0],
-    [loanPayments]
-  );
+  // Plain computation, not a hook: this runs after the early return above, and
+  // a hook here would change the hook count if `loan` appeared or disappeared
+  // while the page is mounted.
+  const targetPayment = [...loanPayments]
+    .filter((p) => p.paymentStatus !== 'Received' && p.paymentStatus !== 'Waived' && p.paymentStatus !== 'Claimed')
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
 
   function openUpiModal() {
     setUpiStep('initiate');
@@ -346,6 +358,9 @@ export function LoanDetailPage() {
           <p className="mt-3 text-xs text-slate-500 italic border-t border-slate-100 pt-3">{loan.remarks}</p>
         )}
       </div>
+
+      {/* Principal ledger — repayments, top-ups, closure */}
+      <PrincipalLedger key={loan.loanId} loan={loan} canManage={canManagePrincipal} />
 
       {/* Confirmation Panel */}
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">

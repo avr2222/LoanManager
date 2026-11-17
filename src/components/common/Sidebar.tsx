@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { LayoutDashboard, CreditCard, BarChart3, Upload, HandCoins, User, Users } from 'lucide-react';
+import { LayoutDashboard, CreditCard, BarChart3, Upload, HandCoins, User, Users, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { usePayments } from '@/context/PaymentContext';
@@ -40,6 +40,7 @@ export function Sidebar() {
   const adminOnlyNav = [
     { to: '/users',  icon: Users,  label: t('nav.users'),   badge: 0 },
     { to: '/import', icon: Upload, label: t('nav.import'),  badge: 0 },
+    { to: '/trash',  icon: Trash2, label: t('nav.trash'),   badge: 0 },
   ];
 
   const roleLabel = isAdmin ? t('nav.admin') : t('nav.member');

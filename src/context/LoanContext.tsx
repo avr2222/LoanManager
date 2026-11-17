@@ -40,7 +40,10 @@ function loanReducer(state: Loan[], action: LoanAction): Loan[] {
 interface LoanContextValue {
   loans: Loan[];
   addLoan: (loan: Loan) => Promise<Loan>;
-  updateLoan: (loan: Loan) => Promise<void>;
+  /** Saves the loan and returns it with derived fields recalculated. */
+  updateLoan: (loan: Loan) => Promise<Loan>;
+  /** Update local state only — for changes already written by an RPC. */
+  applyLoanLocal: (loan: Loan) => void;
   deleteLoan: (loanId: string) => Promise<void>;
   restoreLoan: (loanId: string) => Promise<void>;
   setLoanStatus: (loanId: string, status: Loan['loanStatus']) => Promise<void>;
@@ -70,6 +73,11 @@ export function LoanProvider({ children }: { children: ReactNode }) {
     const updated = deriveLoanFields({ ...loan, updatedAt: undefined as unknown as string } as Parameters<typeof deriveLoanFields>[0]);
     await loansService.upsert(updated);
     dispatch({ type: 'UPDATE', payload: updated });
+    return updated;
+  }, []);
+
+  const applyLoanLocal = useCallback((loan: Loan) => {
+    dispatch({ type: 'UPDATE', payload: loan });
   }, []);
 
   const deleteLoan = useCallback(async (loanId: string) => {
@@ -99,7 +107,7 @@ export function LoanProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <LoanContext.Provider value={{ loans, addLoan, updateLoan, deleteLoan, restoreLoan, setLoanStatus, bulkLoadLoans }}>
+    <LoanContext.Provider value={{ loans, addLoan, updateLoan, applyLoanLocal, deleteLoan, restoreLoan, setLoanStatus, bulkLoadLoans }}>
       {children}
     </LoanContext.Provider>
   );

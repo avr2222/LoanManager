@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { deriveLoanFields, derivePaymentFields, generateMonthlyPayment, buildMissingPayments, computeKPIs, isOverduePayment } from '../calculationService';
+import { deriveLoanFields, derivePaymentFields, generateMonthlyPayment, buildMissingPayments, repricePendingPayments, computeKPIs, isOverduePayment } from '../calculationService';
 import { getDueDateForMonth, toISODateString } from '@/utils/dateUtils';
 import type { Loan, Payment } from '@/types';
 
@@ -257,6 +257,80 @@ describe('buildMissingPayments', () => {
     pinToday();
     const loan = makeLoan({ loanId: 'L001', dateGiven: '2024-01-10', loanStatus: 'Closed' });
     expect(buildMissingPayments([loan], [])).toEqual([]);
+  });
+});
+
+// ─── repricePendingPayments ─────────────────────────────────────────────────
+
+describe('repricePendingPayments', () => {
+  // Loan after a ₹20,000 repayment: 80,000 at 24% → ₹1,600 / month
+  const repaid = deriveLoanFields(makeLoan({ principalAmount: 80000 }));
+
+  const rows = () => [
+    makePayment({ id: 'nov',     monthYear: 'Nov-2026', dueDate: '2026-11-15' }),
+    makePayment({ id: 'dec',     monthYear: 'Dec-2026', dueDate: '2026-12-15' }),
+    makePayment({ id: 'jan',     monthYear: 'Jan-2027', dueDate: '2027-01-15' }),
+    makePayment({ id: 'partial', monthYear: 'Feb-2027', dueDate: '2027-02-15', paymentStatus: 'Partial', amountReceived: 500 }),
+    makePayment({ id: 'claimed', monthYear: 'Mar-2027', dueDate: '2027-03-15', paymentStatus: 'Claimed', amountReceived: 2000 }),
+    makePayment({ id: 'paid',    monthYear: 'Apr-2027', dueDate: '2027-04-15', paymentStatus: 'Received', amountReceived: 2000 }),
+    makePayment({ id: 'waived',  monthYear: 'May-2027', dueDate: '2027-05-15', paymentStatus: 'Waived' }),
+    makePayment({ id: 'other',   loanId: 'L999', monthYear: 'Dec-2026', dueDate: '2026-12-15' }),
+  ];
+
+  it('re-prices the next due payment onwards after a repayment (exclusive date)', () => {
+    // Repaid on 20-Nov: the 15-Nov payment was already due and keeps the old amount
+    const result = repricePendingPayments(repaid, rows(), { from: '2026-11-20', inclusive: false });
+    expect(result.map((p) => p.id)).toEqual(['dec', 'jan']);
+    for (const p of result) {
+      expect(p.interestAmount).toBe(1600);
+      expect(p.netAmountExpected).toBe(1600);
+      expect(p.pendingAmount).toBe(1600);
+      expect(p.paymentStatus).toBe('Pending');
+    }
+  });
+
+  it('a payment due exactly on the repayment date keeps the old amount', () => {
+    const result = repricePendingPayments(repaid, rows(), { from: '2026-12-15', inclusive: false });
+    expect(result.map((p) => p.id)).toEqual(['jan']);
+  });
+
+  it('inclusive mode (loan edit) includes a payment due on the boundary date', () => {
+    const result = repricePendingPayments(repaid, rows(), { from: '2026-12-15', inclusive: true });
+    expect(result.map((p) => p.id)).toEqual(['dec', 'jan']);
+  });
+
+  it('never touches Partial, Claimed, Received or Waived rows, or other loans', () => {
+    const ids = repricePendingPayments(repaid, rows(), { from: '2020-01-01', inclusive: true }).map((p) => p.id);
+    expect(ids).toEqual(['nov', 'dec', 'jan']);
+  });
+
+  it('recomputes the mediator share and net amount for mediator loans', () => {
+    const loan = deriveLoanFields(makeLoan({ loanType: 'Through Mediator', mediatorName: 'M', mediatorCommissionPct: 25, principalAmount: 80000 }));
+    const [p] = repricePendingPayments(loan, [makePayment({ id: 'dec', dueDate: '2026-12-15' })], { from: '2026-11-20', inclusive: false });
+    expect(p.interestAmount).toBe(1600);
+    expect(p.mediatorShare).toBe(400);
+    expect(p.netAmountExpected).toBe(1200);
+    expect(p.pendingAmount).toBe(1200);
+  });
+
+  it('returns nothing when the amounts already match', () => {
+    const loan = deriveLoanFields(makeLoan()); // still ₹2,000 / month — same as the rows
+    expect(repricePendingPayments(loan, rows(), { from: '2020-01-01', inclusive: true })).toEqual([]);
+  });
+
+  it('a top-up raises the pending amounts', () => {
+    const toppedUp = deriveLoanFields(makeLoan({ principalAmount: 150000 }));
+    const [p] = repricePendingPayments(toppedUp, [makePayment({ id: 'dec', dueDate: '2026-12-15' })], { from: '2026-11-20', inclusive: false });
+    expect(p.netAmountExpected).toBe(3000);
+  });
+
+  it('undo round-trips: re-pricing back to the old principal restores the amounts', () => {
+    const after = repricePendingPayments(repaid, rows(), { from: '2026-11-20', inclusive: false });
+    const original = deriveLoanFields(makeLoan());
+    const merged = rows().map((r) => after.find((a) => a.id === r.id) ?? r);
+    const back = repricePendingPayments(original, merged, { from: '2026-11-20', inclusive: false });
+    expect(back.map((p) => p.id)).toEqual(['dec', 'jan']);
+    expect(back.every((p) => p.netAmountExpected === 2000)).toBe(true);
   });
 });
 

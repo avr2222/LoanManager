@@ -137,6 +137,49 @@ export function buildMissingPayments(
   return result;
 }
 
+/**
+ * Pending payments of `loan` whose amounts no longer match the loan's current
+ * monthly figures — returned with the new amounts. Used after the principal or
+ * rate changes (repayment, top-up, edit).
+ *
+ * Only untouched rows are re-priced: status `Pending` with nothing received.
+ * Partial / Claimed / Received / Waived rows keep the amounts they were agreed at.
+ *
+ * @param from       ISO date boundary
+ * @param inclusive  true  → rows due on or after `from` (loan edit: "from today")
+ *                   false → rows due strictly after `from` (repayment made on `from`:
+ *                           the next due payment onwards uses the new principal)
+ */
+export function repricePendingPayments(
+  loan: Loan,
+  payments: Payment[],
+  opts: { from: string; inclusive: boolean },
+): Payment[] {
+  const from = opts.from.slice(0, 10);
+  const now = new Date().toISOString();
+  return payments
+    .filter((p) => {
+      if (p.loanId !== loan.loanId) return false;
+      if (p.paymentStatus !== 'Pending' || p.amountReceived !== 0) return false;
+      const due = (p.dueDate ?? '').slice(0, 10);
+      if (!(opts.inclusive ? due >= from : due > from)) return false;
+      return (
+        p.interestAmount !== loan.monthlyInterestAmount ||
+        p.mediatorShare !== loan.mediatorMonthlyShare ||
+        p.netAmountExpected !== loan.netMonthlyReceipt
+      );
+    })
+    .map((p) =>
+      derivePaymentFields({
+        ...p,
+        interestAmount: loan.monthlyInterestAmount,
+        mediatorShare: loan.mediatorMonthlyShare,
+        netAmountExpected: loan.netMonthlyReceipt,
+        updatedAt: now,
+      })
+    );
+}
+
 /** Overdue = past due and money still outstanding (Pending/Partial/Claimed).
  *  Single source of truth — Sidebar badges and table filters use the same rule. */
 export function isOverduePayment(p: Pick<Payment, 'daysOverdue' | 'paymentStatus'>): boolean {

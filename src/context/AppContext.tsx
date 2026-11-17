@@ -14,8 +14,7 @@ import { useAuth } from './AuthContext';
  *  Degrades to an empty set on error, so generation is never blocked. */
 async function fetchDeletedKeys(): Promise<Set<string>> {
   try {
-    const deleted = await paymentsService.fetchDeleted();
-    return new Set(deleted.map((p) => `${p.loanId}::${p.monthYear}`));
+    return await paymentsService.fetchDeletedKeys();
   } catch (err) {
     console.warn('[AutoGen] Could not fetch deleted payments for exclusion:', err);
     return new Set();
@@ -28,6 +27,8 @@ interface AppContextValue {
   importFile: (file: File) => Promise<{ warnings: string[] }>;
   exportData: () => void;
   clearAllData: () => Promise<void>;
+  /** Re-fetch loans and payments from Supabase (e.g. after restoring from Trash). */
+  refreshData: () => Promise<void>;
   profileMap: Map<string, string>;
 }
 
@@ -195,8 +196,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bulkLoadPayments([]);
   }, [bulkLoadLoans, bulkLoadPayments]);
 
+  const refreshData = useCallback(async () => {
+    const [l, p] = await Promise.all([loansService.fetchAll(), paymentsService.fetchAll()]);
+    bulkLoadLoans(l);
+    bulkLoadPayments(p);
+  }, [bulkLoadLoans, bulkLoadPayments]);
+
   return (
-    <AppContext.Provider value={{ loading, autoImporting, importFile, exportData, clearAllData, profileMap }}>
+    <AppContext.Provider value={{ loading, autoImporting, importFile, exportData, clearAllData, refreshData, profileMap }}>
       {children}
     </AppContext.Provider>
   );
